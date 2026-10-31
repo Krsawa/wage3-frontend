@@ -1,0 +1,21 @@
+name,email,wallet,amount
+Ada Lovelace,ada.lovelace@example.com,0x3bD05e76b5DD19c72E8fd63b253dFFeeAf40931d,0.05
+Grace Hopper,grace.hopper@example.com,0xA556D024bF5EAC50229648Dd0527Ba187703B834,0.05
+Alan Turing,alan.turing@example.com,0x5998CFA2b9F3434B9DEc3b9a9295A87B11701a31,0.05
+Katherine Johnson,katherine.johnson@example.com,0xBf00BA9241414668C1319b7983eFe7134c6B64f8,0.05
+Linus Torvalds,linus.torvalds@example.com,0x40AadD64a52A733b473d7C0058dC731acF1CED33,0.05
+Margaret Hamilton,margaret.hamilton@example.com,0xD80D301d57c7C01C1F75d6F5b5764E40b24cc966,0.05
+Dennis Ritchie,dennis.ritchie@example.com,0x3CbA7c67EF33ed93d2d68c304Ee93A574c9eFd31,0.05
+Barbara Liskov,barbara.liskov@example.com,0xD018A5199c4823DE0805DAF573500fd63F332336,0.05
+Ken Thompson,ken.thompson@example.com,0xEDe9e0D7Fdf689eF26023B6c29bC9AB550CE7727,0.05
+Radia Perlman,radia.perlman@example.com,0xB0Aa91e88DaBBF85D0a2A134eE196C9dd32762AF,0.05
+Tim Berners-Lee,tim.berners.lee@example.com,0x28be72b2fa30eb7cd531330C79eA248dd061acC4,0.05
+Frances Allen,frances.allen@example.com,0x9199D5Cb87ac1fC765B02b3cCdE1F5C346B0236a,0.05
+Donald Knuth,donald.knuth@example.com,0x634b7e363d06D1B56dFa44BB13A972F83133333d,0.05
+Hedy Lamarr,hedy.lamarr@example.com,0xc5b233cE2a1A00651036c1433E98a7df88568FE9,0.05
+Vint Cerf,vint.cerf@example.com,0xE118d81C6056f9D2143806526E15f5399F0e2351,0.05
+Shafi Goldwasser,shafi.goldwasser@example.com,0x02d8715A558C27727bdEf2b48c31D8B805d105ae,0.05
+John Carmack,john.carmack@example.com,0xCDB40832167214a6315E47A964877b9408b07060,0.05
+Annie Easley,annie.easley@example.com,0x08e3cFBA762DD1271a9055a23170e4Cc0d586009,0.05
+Guido van Rossum,guido.van.rossum@example.com,0x823a839c14B4F4d5dFf354Ed9E2DE61F8d610366,0.05
+Joan Clarke,joan.clarke@example.com,0xa88336cB7167eE6f6F915F703D81dB4E142B9D1b,0.05

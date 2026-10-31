@@ -1,0 +1,224 @@
+@import "tailwindcss";
+
+/*
+ * Base brand tokens (brand.base.org). Grayscale and white space lead;
+ * Base Blue is reserved for the single most important element on screen.
+ * Secondary colors only for status, never as heroes. No gradients.
+ */
+:root {
+  --base-blue: #0000ff;
+  --gray-0: #ffffff;
+  --gray-10: #eef0f3;
+  --gray-15: #dee1e7;
+  --gray-30: #b1b7c3;
+  --gray-50: #717886;
+  --gray-60: #5b616e;
+  --gray-80: #32353d;
+  --gray-100: #0a0b0d;
+
+  --bg: var(--gray-0);
+  --surface: var(--gray-0);
+  --surface-muted: var(--gray-10);
+  --surface-sunken: #f7f8fa;
+  --border: var(--gray-15);
+  --border-strong: var(--gray-30);
+  --fg: var(--gray-100);
+  --fg-muted: var(--gray-60);
+  --fg-subtle: var(--gray-50);
+  --primary: var(--base-blue);
+  --primary-hover: #0000d6;
+  --primary-fg: #ffffff;
+  --primary-soft: #ebebff;
+  --inverse: var(--gray-100);
+  --inverse-fg: #ffffff;
+
+  /* Product status colors: brand hues, darkened where text needs AA. */
+  --success: #66c800;
+  --success-fg: #2e6b00;
+  --success-soft: #eefadf;
+  --danger: #fc401f;
+  --danger-fg: #c42a0e;
+  --danger-soft: #fff0ec;
+  --warning: #ffd12f;
+  --warning-fg: #7a5c00;
+  --warning-soft: #fff8dc;
+  --info: #3c8aff;
+  --info-fg: #1f5fcc;
+  --info-soft: #eaf2ff;
+
+  --ring: var(--base-blue);
+  --shadow-sm: 0 1px 2px rgb(10 11 13 / 0.04), 0 1px 1px rgb(10 11 13 / 0.03);
+  --shadow-md: 0 4px 16px -4px rgb(10 11 13 / 0.08), 0 2px 4px rgb(10 11 13 / 0.04);
+  --shadow-lg: 0 24px 48px -12px rgb(10 11 13 / 0.18), 0 4px 12px rgb(10 11 13 / 0.06);
+  --overlay: rgb(10 11 13 / 0.4);
+
+  /* Motion (emil-design-eng). Never ease-in on UI. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: var(--gray-100);
+    --surface: #141519;
+    --surface-muted: #1e2025;
+    --surface-sunken: #0f1013;
+    --border: #2a2c32;
+    --border-strong: #3d4048;
+    --fg: #ffffff;
+    --fg-muted: var(--gray-30);
+    --fg-subtle: #8a909c;
+    --primary: #3c3cff;
+    --primary-hover: #5252ff;
+    --primary-soft: #16163d;
+    --inverse: #ffffff;
+    --inverse-fg: var(--gray-100);
+    --success-fg: #8ee03a;
+    --success-soft: #16240a;
+    --danger-fg: #ff7a61;
+    --danger-soft: #2d130e;
+    --warning-fg: #ffd12f;
+    --warning-soft: #2b2408;
+    --info-fg: #7fb2ff;
+    --info-soft: #0f1e36;
+    --ring: #5252ff;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 16px -4px rgb(0 0 0 / 0.5);
+    --shadow-lg: 0 24px 48px -12px rgb(0 0 0 / 0.7);
+    --overlay: rgb(0 0 0 / 0.6);
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-soft: var(--primary-soft);
+  --color-inverse: var(--inverse);
+  --color-inverse-fg: var(--inverse-fg);
+  --color-base-blue: var(--base-blue);
+  --color-success: var(--success);
+  --color-success-fg: var(--success-fg);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-fg: var(--info-fg);
+  --color-info-soft: var(--info-soft);
+  --color-ring: var(--ring);
+
+  --font-sans: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-roboto-mono), ui-monospace, monospace;
+  --font-display: var(--font-doto), var(--font-inter-tight), sans-serif;
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  --ease-out: var(--ease-out);
+  --ease-in-out: var(--ease-in-out);
+  --ease-drawer: var(--ease-drawer);
+
+  --animate-shimmer: shimmer 1.4s linear infinite;
+  --animate-spin-fast: spin 0.6s linear infinite;
+
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: light dark;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-feature-settings: "liga" 0; /* Base: ligatures off by default */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: var(--base-blue);
+    color: #fff;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Headline: Medium, -3% tracking, 100% leading (brand typography spec). */
+@utility headline {
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+/* Base-style pressable: instant scale feedback, never on hover-only devices. */
+@utility pressable {
+  transition-property: transform, background-color, border-color, color, box-shadow, opacity;
+  transition-duration: 160ms;
+  transition-timing-function: var(--ease-out);
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes menu-out {
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
