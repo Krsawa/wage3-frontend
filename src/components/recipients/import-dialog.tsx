@@ -1,7 +1,6 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Download, FileSpreadsheet, Upload } from "lucide-react";
 import { useMemo, useRef, useState, type DragEvent } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -9,10 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/input";
+import { DownloadIcon, FileIcon } from "@/components/ui/icons";
 import { useRowSelection } from "@/hooks/use-row-selection";
 import { USDC } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { formatAmount, parseAmount, pluralize, shortAddress } from "@/lib/format";
+import { SLIDE } from "@/lib/motion";
 import {
   CSV_TEMPLATE,
   parseRecipientsText,
@@ -136,19 +137,19 @@ export function ImportDialog({
           />
         ) : (
           <motion.div key="pick" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="mb-4 inline-flex rounded-full bg-surface-muted p-1 text-sm font-medium">
+            <div className="mb-4 inline-flex h-9 items-center rounded-[10px] bg-surface-sunken p-0.5 text-sm font-medium ring-1 ring-border-subtle ring-inset [corner-shape:superellipse(1.5)]">
               {(["file", "paste"] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setTab(t)}
                   className={cn(
-                    "relative rounded-full px-3.5 py-1.5 transition-colors duration-150",
+                    "relative flex h-8 items-center rounded-[8px] px-3.5 transition-colors duration-150 [corner-shape:superellipse(1.5)]",
                     tab === t ? "text-fg" : "text-fg-muted hover:text-fg",
                   )}
                 >
                   {tab === t && (
-                    <motion.span layoutId="import-tab" className="absolute inset-0 rounded-full bg-surface shadow-sm" transition={{ type: "spring", duration: 0.3, bounce: 0.1 }} />
+                    <motion.span layoutId="import-tab" className="absolute inset-0 rounded-[8px] bg-(--color-200) [corner-shape:superellipse(1.5)]" transition={SLIDE} />
                   )}
                   <span className="relative">{t === "file" ? "Upload CSV" : "Paste"}</span>
                 </button>
@@ -167,14 +168,17 @@ export function ImportDialog({
                 onDragLeave={() => setDragging(false)}
                 onDrop={onDrop}
                 className={cn(
-                  "flex w-full flex-col items-center rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors duration-150",
-                  dragging ? "border-primary bg-primary-soft" : "border-border hover:border-border-strong hover:bg-surface-sunken",
+                  "flex w-full flex-col items-center rounded-2xl border border-dashed px-6 py-8 text-center transition-colors duration-150",
+                  dragging ? "border-primary bg-primary-soft" : "border-border hover:border-border-strong hover:bg-surface-hover",
                 )}
               >
                 <span className={cn("grid size-11 place-items-center rounded-full transition-colors", dragging ? "bg-primary text-primary-fg" : "bg-surface-muted text-fg-muted")}>
-                  <Upload className="size-5" />
+                  <FileIcon className="size-5" />
                 </span>
-                <span className="mt-4 text-sm font-medium">Drop a CSV here, or click to choose</span>
+                <span className="mt-4 text-sm font-medium">
+                  <span className="sm:hidden">Choose a CSV file</span>
+                  <span className="hidden sm:inline">Drop a CSV here, or click to choose</span>
+                </span>
                 <span className="mt-1 text-[13px] text-fg-subtle">Exported from Sheets, Excel or Notion</span>
               </button>
             ) : (
@@ -210,7 +214,7 @@ export function ImportDialog({
               onClick={downloadTemplate}
               className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-fg-muted hover:text-fg"
             >
-              <Download className="size-3.5" /> Download a template
+              <DownloadIcon className="size-3.5" /> Download a template
             </button>
             <input
               ref={fileRef}
@@ -284,7 +288,7 @@ function Preview({
       className="flex flex-col"
     >
       <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface-muted px-4 py-3">
-        <FileSpreadsheet className="size-5 shrink-0 text-fg-muted" />
+        <FileIcon className="size-5 shrink-0 text-fg-muted" />
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium">{result.fileName ?? "Pasted text"}</div>
           <div className="text-[13px] text-fg-muted">
@@ -328,7 +332,7 @@ function Preview({
                   onClick={(e) => sel.toggle(r.key, !on, e.shiftKey)}
                   className={cn(
                     "cursor-pointer transition-colors duration-100 select-none",
-                    on ? "hover:bg-surface-sunken" : "text-fg-subtle hover:bg-surface-sunken",
+                    on ? "hover:bg-surface-hover" : "text-fg-subtle hover:bg-surface-hover",
                   )}
                 >
                   <td className="py-2.5 pl-3.5" onClick={(e) => e.stopPropagation()}>

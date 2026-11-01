@@ -89,10 +89,11 @@ export function usePayout(id: string | undefined) {
 }
 
 /** Refetches every 10s while any row on the page is still on its way on-chain. */
-export function useSentHistory(q?: SentHistoryQuery) {
+export function useSentHistory(q?: SentHistoryQuery, { enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: qk.history(q),
     queryFn: () => historyApi.sent(q),
+    enabled,
     placeholderData: keepPreviousData,
     refetchInterval: (query) =>
       query.state.data?.items.some((p) => p.status === "submitted") ? 10_000 : false,

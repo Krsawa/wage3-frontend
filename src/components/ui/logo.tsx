@@ -10,10 +10,11 @@ export function LogoMark({ className }: { className?: string }) {
   );
 }
 
-export function Logo({ className }: { className?: string }) {
+/** `mark={false}`: wordmark only, as in the app sidebar. */
+export function Logo({ className, mark = true }: { className?: string; mark?: boolean }) {
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
-      <LogoMark />
+      {mark && <LogoMark />}
       <span className="text-[17px] font-semibold tracking-[-0.03em]">wage3</span>
     </span>
   );

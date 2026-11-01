@@ -18,7 +18,7 @@ export function StatusBanner() {
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}
-          className="overflow-hidden bg-warning text-gray-100"
+          className="overflow-hidden bg-warning text-(--gray-100)"
         >
           <div className="mx-auto flex max-w-6xl items-center justify-center gap-2 px-4 py-2 text-center text-[13px] font-medium">
             <PauseCircle className="size-4 shrink-0" />

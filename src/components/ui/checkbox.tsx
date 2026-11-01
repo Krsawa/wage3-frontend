@@ -1,9 +1,12 @@
 "use client";
 
-import { Check, Minus } from "lucide-react";
 import { useEffect, useRef, type InputHTMLAttributes, type MouseEvent } from "react";
 
+import { CheckIcon, DeleteIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+
+// Blue 9 (white tick 3.54:1, above the 3:1 for controls), blue 10 under the pointer.
+const ON = "border-(--blue-9) bg-(--blue-9) hover:border-(--blue-10) hover:bg-(--blue-10)";
 
 /** Native checkbox (keyboard + screen readers for free), styled. Supports indeterminate. */
 export function Checkbox({
@@ -38,17 +41,18 @@ export function Checkbox({
         }}
         onChange={() => {}}
         className={cn(
-          "peer absolute inset-0 m-0 cursor-pointer appearance-none rounded-[5px] border transition-[background-color,border-color] duration-150",
-          on ? "border-primary bg-primary" : "border-border-strong bg-surface hover:border-fg-subtle",
+          "peer absolute inset-0 m-0 cursor-pointer appearance-none rounded-[6px] border outline-none transition-[background-color,border-color,box-shadow] duration-150",
+          "focus-visible:shadow-[0_0_0_3px_var(--blue-5)]",
+          on ? ON : "border-border-strong bg-surface hover:border-fg-subtle",
           "disabled:cursor-default disabled:opacity-45",
         )}
         {...props}
       />
-      <span className="pointer-events-none relative text-primary-fg">
+      <span className="pointer-events-none relative text-white">
         {indeterminate ? (
-          <Minus className="size-3" strokeWidth={3.5} />
+          <DeleteIcon className="size-3" strokeWidth={3} />
         ) : checked ? (
-          <Check className="size-3" strokeWidth={3.5} />
+          <CheckIcon className="size-3" strokeWidth={3} />
         ) : null}
       </span>
     </span>

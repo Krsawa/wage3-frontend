@@ -49,3 +49,6 @@ Thumbs.db
 
 # Claude Code: personal settings stay local (project skills in .claude/skills are shared)
 .claude/settings.local.json
+
+# Commercial font (Monument Grotesk): kept local until there is a web licence
+public/fonts/*.otf

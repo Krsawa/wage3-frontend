@@ -61,7 +61,7 @@ export function Providers({ children }: { children: ReactNode }) {
       <WagmiProvider config={wagmiConfig}>
         <QueryClientProvider client={queryClient}>
           <MotionConfig reducedMotion="user" transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}>
-            <TooltipProvider delayDuration={300} skipDelayDuration={400}>
+            <TooltipProvider delayDuration={400} skipDelayDuration={400}>
               {children}
               <Toaster />
             </TooltipProvider>

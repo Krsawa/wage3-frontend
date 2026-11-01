@@ -2,12 +2,12 @@
 
 import { Dialog as D } from "radix-ui";
 import { AnimatePresence, motion } from "motion/react";
-import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
 
 import { Button } from "./button";
+import { CloseIcon } from "./icons";
 
 /**
  * Controlled modal. Centered (modals aren't anchored to a trigger), enters with
@@ -55,7 +55,7 @@ export function Dialog({
               >
                 <motion.div
                   className={cn(
-                    "pointer-events-auto relative flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-border bg-surface shadow-lg sm:max-w-md sm:rounded-3xl",
+                    "pointer-events-auto relative flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-surface shadow-[0_0_0_0.5px_oklch(0.178_0_0/0.08),0_24px_48px_-12px_oklch(0.178_0_0/0.18),0_4px_12px_oklch(0.178_0_0/0.06)] sm:max-w-md sm:rounded-3xl",
                     className,
                   )}
                   initial={{ opacity: 0, transform: "translateY(16px) scale(0.96)" }}
@@ -71,12 +71,12 @@ export function Dialog({
                   }}
                 >
                   <div className="flex items-start justify-between gap-4 px-6 pt-6">
-                    <div className="min-w-0">
-                      <D.Title className="text-lg font-semibold tracking-[-0.02em] text-balance">
+                    <div className="min-w-0 flex-1">
+                      <D.Title className="headline text-[20px] leading-7 font-normal text-balance">
                         {title}
                       </D.Title>
                       {description ? (
-                        <D.Description className="mt-1.5 text-sm text-fg-muted text-pretty">
+                        <D.Description className="mt-1 text-sm text-fg-muted text-pretty">
                           {description}
                         </D.Description>
                       ) : (
@@ -85,16 +85,16 @@ export function Dialog({
                     </div>
                     {dismissible && (
                       <D.Close
-                        className="pressable -mt-1 -mr-2 grid size-9 shrink-0 place-items-center rounded-full text-fg-subtle hover:bg-surface-muted hover:text-fg"
+                        className="pressable -mt-1 -mr-2.5 grid size-9 shrink-0 place-items-center rounded-full text-fg-subtle hover:bg-surface-hover hover:text-fg"
                         aria-label="Close"
                       >
-                        <X className="size-4.5" />
+                        <CloseIcon className="size-4.5" />
                       </D.Close>
                     )}
                   </div>
                   {children && <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-6">{children}</div>}
                   {footer && (
-                    <div className="flex flex-col-reverse gap-2 border-t border-border bg-surface-sunken px-6 py-4 sm:flex-row sm:justify-end">
+                    <div className="flex flex-col-reverse gap-2 bg-surface-sunken px-6 py-4 sm:flex-row sm:justify-end">
                       {footer}
                     </div>
                   )}
@@ -141,7 +141,7 @@ export function ConfirmDialog({
             type="button"
             onClick={() => onOpenChange(false)}
             disabled={loading}
-            className="pressable h-10 rounded-full px-4 text-sm font-medium text-fg-muted hover:bg-surface-muted hover:text-fg disabled:opacity-45"
+            className="pressable h-10 rounded-full px-4 text-sm font-medium text-fg-muted hover:bg-surface-hover hover:text-fg disabled:opacity-45"
           >
             Cancel
           </button>

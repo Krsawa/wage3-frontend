@@ -1,13 +1,14 @@
 "use client";
 
 import { motion, type Variants } from "motion/react";
-import { ArrowRight, ArrowUpRight, FileSpreadsheet, KeyRound, PenLine, ScanSearch, ShieldCheck, Zap } from "lucide-react";
+import { ArrowRight, ArrowUpRight, KeyRound, PenLine, ScanSearch, Zap } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { StatusBanner } from "@/components/shell/status-banner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FileIcon, ShieldCheckIcon } from "@/components/ui/icons";
 import { Logo, LogoMark } from "@/components/ui/logo";
 import { useSession } from "@/lib/auth/use-session";
 import { chain } from "@/lib/config";
@@ -216,7 +217,7 @@ export default function LandingPage() {
 
 const STEPS = [
   {
-    icon: <FileSpreadsheet />,
+    icon: <FileIcon />,
     title: "Add people",
     body: "Import a CSV, paste from a spreadsheet, or start from a saved list. Wallets are checked as you type.",
   },
@@ -249,7 +250,7 @@ const FACTS = [
     body: "Each batch has a public transaction you can share as a receipt.",
   },
   {
-    icon: <ShieldCheck />,
+    icon: <ShieldCheckIcon />,
     title: "No double payments",
     body: "Each batch has a unique reference the contract accepts only once.",
   },

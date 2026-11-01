@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, Copy, FileQuestion, ListPlus, MoreHorizontal, Pencil, Repeat } from "lucide-react";
+import { AlertTriangle, FileQuestion, MoreHorizontal, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -13,15 +13,26 @@ import { SendCard } from "@/components/pay/send-card";
 import { RecipientsEditor } from "@/components/recipients/recipients-editor";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownContent, DropdownItem, DropdownMenu, DropdownSeparator, DropdownTrigger } from "@/components/ui/dropdown";
+import { CopyIcon, DownloadIcon, ListPlusIcon, RepeatIcon } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { PayoutStatusBadge } from "@/components/ui/status-badge";
-import { usePayout, useRenamePayout, useUpdatePayoutItems } from "@/lib/api/queries";
+import { useList, usePayout, useRenamePayout, useReplaceRecipients, useUpdatePayoutItems } from "@/lib/api/queries";
 import type { Payout } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
-import { formatDateTime, pluralize } from "@/lib/format";
-import { rowsFromPayoutItems, rowsToPayoutItems, rowsTotal, validateRows, type RecipientRow } from "@/lib/recipients";
+import { downloadPayoutCsv } from "@/lib/export-payout";
+import { formatDateTime, formatRelative, pluralize } from "@/lib/format";
+import {
+  rowsFromPayoutItems,
+  rowsToPayoutItems,
+  rowsToRecipientInputs,
+  rowsTotal,
+  validateRows,
+  type RecipientRow,
+} from "@/lib/recipients";
+import { useReviewChecks, type RowFlag } from "@/lib/review-checks";
 import { useSendPayout } from "@/lib/send-payout";
 
 export default function PayoutPage() {
@@ -68,24 +79,21 @@ function PayoutView({ payout }: { payout: Payout }) {
     <>
       <header className="flex flex-col gap-4 pb-8 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <Link
-            href={isDraft ? "/dashboard" : "/history"}
-            className="mb-2 inline-flex items-center gap-1 text-[13px] font-medium text-fg-subtle hover:text-fg"
-          >
-            <ArrowLeft className="size-3.5" /> {isDraft ? "Home" : "History"}
-          </Link>
           <EditableName payout={payout} />
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px] text-fg-muted">
+          {/* Status, then the facts with one even gap. Relative time, since the default name already carries the date; the exact time is on hover. */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-2 text-[13px] text-fg-muted">
             <PayoutStatusBadge status={payout.status} />
             <span>{pluralize(payout.recipient_count ?? payout.items.length, "person", "people")}</span>
             <span aria-hidden>·</span>
-            <span>Created {formatDateTime(payout.created_at)}</span>
+            <time dateTime={payout.created_at} title={formatDateTime(payout.created_at)}>
+              Created {formatRelative(payout.created_at)}
+            </time>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {!isDraft && !hasReady && (
             <Button variant="outline" onClick={() => router.push(`/pay/new?from=${payout.id}`)}>
-              <Repeat className="size-4" /> Pay again
+              <RepeatIcon className="size-4" /> Pay again
             </Button>
           )}
           <DropdownMenu>
@@ -95,15 +103,29 @@ function PayoutView({ payout }: { payout: Payout }) {
               </Button>
             </DropdownTrigger>
             <DropdownContent>
-              <DropdownItem icon={<ListPlus />} onSelect={() => setSaveOpen(true)}>
+              <DropdownItem icon={<ListPlusIcon />} onSelect={() => setSaveOpen(true)}>
                 Save people as a list
               </DropdownItem>
-              <DropdownItem icon={<Repeat />} onSelect={() => router.push(`/pay/new?from=${payout.id}`)}>
-                Pay these people again
-              </DropdownItem>
+              {/* Said once: when the Pay again button shows, the menu doesn't repeat it. */}
+              {(isDraft || hasReady) && (
+                <DropdownItem icon={<RepeatIcon />} onSelect={() => router.push(`/pay/new?from=${payout.id}`)}>
+                  Pay these people again
+                </DropdownItem>
+              )}
               <DropdownSeparator />
+              {!isDraft && (
+                <DropdownItem
+                  icon={<DownloadIcon />}
+                  onSelect={() => {
+                    downloadPayoutCsv(payout);
+                    toast.success(`Exported ${pluralize(payout.items.length, "person", "people")}`);
+                  }}
+                >
+                  Export CSV
+                </DropdownItem>
+              )}
               <DropdownItem
-                icon={<Copy />}
+                icon={<CopyIcon />}
                 onSelect={() => {
                   navigator.clipboard.writeText(window.location.href);
                   toast.success("Link copied");
@@ -161,35 +183,21 @@ function SentView({
   onSave: () => void;
 }) {
   const fromList = !!payout.list_id;
+  // Sending finished: say so in a toast (the progress card below already shows the status),
+  // with the save-as-list follow-up as its action. Resetting clears justFinished, so it fires once.
+  useEffect(() => {
+    if (!justFinished) return;
+    toast(payout.status === "paid" ? "Sent and confirmed on Base" : "Sent. Base is confirming it now", {
+      id: `sent-${payout.id}`, // one toast even if the effect runs twice (dev StrictMode)
+      duration: fromList ? 4000 : 8000,
+      action: fromList ? undefined : { label: "Save as list", onClick: onSave },
+    });
+    onDismiss();
+  }, [justFinished, payout.id, payout.status, fromList, onSave, onDismiss]);
+
   return (
     <div className="flex flex-col gap-6">
-      <AnimatePresence>
-        {justFinished && (
-          <motion.div
-            initial={{ opacity: 0, transform: "translateY(-6px)" }}
-            animate={{ opacity: 1, transform: "translateY(0px)" }}
-            exit={{ opacity: 0 }}
-            className="flex flex-wrap items-center gap-3 rounded-2xl bg-inverse px-5 py-4 text-inverse-fg"
-          >
-            <span className="size-3 rounded-[3px] bg-base-blue" />
-            <span className="text-sm font-medium">
-              {payout.status === "paid"
-                ? "Sent and confirmed on Base."
-                : "Sent. Base is confirming it now, which usually takes under a minute."}
-            </span>
-            <span className="ml-auto flex gap-2">
-              {!fromList && (
-                <Button size="sm" variant="secondary" className="bg-white/10 text-inverse-fg hover:bg-white/20" onClick={onSave}>
-                  Save as list
-                </Button>
-              )}
-              <Button size="sm" variant="secondary" className="bg-white/10 text-inverse-fg hover:bg-white/20" onClick={onDismiss}>
-                Dismiss
-              </Button>
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <RemainingBanner payout={payout} />
       <PayoutProgress payout={payout} />
       <BatchList payout={payout} />
       <ItemsTable payout={payout} />
@@ -197,7 +205,34 @@ function SentView({
   );
 }
 
-type ServerItem = { name?: string | null; email?: string | null; wallet_address: string; amount: string };
+/**
+ * Partially paid: one action to pay only the people who weren't. Hidden while any batch is
+ * still confirming, because a slow batch can still land and retrying it would pay twice.
+ */
+function RemainingBanner({ payout }: { payout: Payout }) {
+  const unpaid = payout.items.filter((i) => i.status !== "paid");
+  const settling = payout.batches.some((b) => b.status === "submitted");
+  if (payout.status !== "partially_paid" || !unpaid.length) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-warning-soft px-5 py-4 text-warning-fg">
+      <span className="flex-1 text-sm text-pretty">
+        {settling
+          ? `${pluralize(unpaid.length, "person hasn't", "people haven't")} been paid yet. Some batches are still confirming on Base, so wait before retrying.`
+          : `${pluralize(unpaid.length, "person wasn't", "people weren't")} paid. Everyone else was.`}
+      </span>
+      {!settling && (
+        <Button asChild size="sm">
+          <Link href={`/pay/new?from=${payout.id}&only=unpaid`}>
+            Pay the {unpaid.length.toLocaleString("en-US")} remaining
+          </Link>
+        </Button>
+      )}
+    </div>
+  );
+}
+
+type ServerItem ={ name?: string | null; email?: string | null; wallet_address: string; amount: string };
 const serialize = (items: ServerItem[]) =>
   JSON.stringify(items.map((i) => [i.name ?? null, i.email ?? null, i.wallet_address.toLowerCase(), i.amount]));
 
@@ -224,6 +259,19 @@ function DraftView({
     return validation.isValid ? serialize(items) : null;
   }, [rows, validation.isValid]);
   const dirty = local !== serialize(payout.items);
+  const checks = useReviewChecks(payout, rows, total);
+
+  // Paying a list with edits: the list only changes if the sender asks (off by default).
+  const list = useList(payout.list_id ?? undefined);
+  const replaceList = useReplaceRecipients(payout.list_id ?? "", { meta: { errorToast: false } });
+  const [updateList, setUpdateList] = useState(false);
+  const listChanged = useMemo(() => {
+    if (!list.data) return false;
+    const lower = (e: string | null | undefined) => e?.toLowerCase() ?? null;
+    const listed = list.data.recipients.map((r) => ({ ...r, email: lower(r.email), amount: r.default_amount ?? "0" }));
+    const current = rowsToPayoutItems(rows).map((i) => ({ ...i, email: lower(i.email) }));
+    return serialize(current) !== serialize(listed);
+  }, [list.data, rows]);
 
   const send = async () => {
     setAttempted(true);
@@ -238,44 +286,67 @@ function DraftView({
         return; // shown inline
       }
     }
+    if (updateList && listChanged && list.data) {
+      replaceList.mutate(rowsToRecipientInputs(rows), {
+        onSuccess: () => toast.success(`Updated “${list.data.name}”`),
+        onError: (e) => toast.error(`Couldn't update the list: ${e.message}`),
+      });
+    }
     onSend();
   };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-      <Card className="min-w-0 p-5">
-        <RecipientsEditor rows={rows} onChange={setRows} mode="payout" showAllErrors={attempted} disabled={state.step !== "idle" && state.step !== "error"} />
-        <AnimatePresence initial={false}>
-          {(dirty || save.error) && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              <div
-                className={cn(
-                  "mt-4 flex flex-wrap items-center gap-3 rounded-xl px-4 py-3 text-[13px]",
-                  save.error ? "bg-danger-soft text-danger-fg" : "bg-surface-muted text-fg-muted",
-                )}
-              >
-                <span className="flex-1">{save.error ? save.error.message : "Changes are saved when you send, or now."}</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  loading={save.isPending}
-                  disabled={!validation.isValid}
-                  onClick={() =>
-                    save.mutate(rowsToPayoutItems(rows), { onSuccess: () => toast.success("Draft saved") })
-                  }
-                >
-                  Save draft
-                </Button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      <div className="flex min-w-0 flex-col gap-4">
+      <ReviewFlags flags={checks.flags} recentDuplicate={checks.recentDuplicate} />
+      {/* Light grey card; the table runs to its bottom edge, so the save notice and list option sit below it. */}
+      <Card className="min-w-0 overflow-hidden bg-(--color-25) p-5">
+        <RecipientsEditor
+          rows={rows}
+          onChange={setRows}
+          mode="payout"
+          flush="end"
+          showAllErrors={attempted}
+          disabled={state.step !== "idle" && state.step !== "error"}
+        />
       </Card>
+      <AnimatePresence initial={false}>
+        {(dirty || save.error) && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div
+              className={cn(
+                "flex flex-wrap items-center gap-3 rounded-xl px-4 py-3 text-[13px]",
+                save.error ? "bg-danger-soft text-danger-fg" : "bg-surface-muted text-fg-muted",
+              )}
+            >
+              <span className="flex-1">{save.error ? save.error.message : "Changes are saved when you send, or now."}</span>
+              <Button
+                size="sm"
+                variant="outline"
+                loading={save.isPending}
+                disabled={!validation.isValid}
+                onClick={() =>
+                  save.mutate(rowsToPayoutItems(rows), { onSuccess: () => toast.success("Draft saved") })
+                }
+              >
+                Save draft
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {listChanged && list.data && (
+        <label className="flex items-center gap-2.5 px-1 text-[13px] text-fg-muted">
+          <Checkbox checked={updateList} onCheckedChange={(on) => setUpdateList(on)} />
+          Update “{list.data.name}” with these changes
+        </label>
+      )}
+      </div>
       <aside className="lg:sticky lg:top-24">
         <SendCard
           payout={payout}
@@ -283,6 +354,7 @@ function DraftView({
           count={validation.filledCount}
           state={state}
           onSend={send}
+          requireTypedTotal={checks.requireTypedTotal}
           onRetry={dirty ? send : onRetry}
           disabledReason={
             attempted && !validation.isValid
@@ -294,6 +366,34 @@ function DraftView({
         />
       </aside>
     </div>
+  );
+}
+
+/** Things to double-check before signing, since sent USDC can't be pulled back. */
+function ReviewFlags({ flags, recentDuplicate }: { flags: RowFlag[]; recentDuplicate: string | null }) {
+  if (!flags.length && !recentDuplicate) return null;
+  return (
+    // A notice, not a card: one solid amber fill (no translucent wash over a shadowed card), text in the amber family.
+    <section className="rounded-2xl bg-warning-soft p-5">
+      <h2 className="flex items-center gap-2 text-sm font-medium text-(--amber-12)">
+        <AlertTriangle className="size-4 shrink-0 text-warning-fg" /> Check before you send
+      </h2>
+      {/* Indented to the title's text, not the icon. */}
+      <div className="pl-6">
+        {recentDuplicate && <p className="mt-2 text-[13px] text-warning-fg">{recentDuplicate}</p>}
+        {flags.length > 0 && (
+          <ul className="mt-2.5 flex flex-col gap-1.5 text-[13px]">
+            {flags.slice(0, 8).map((f) => (
+              <li key={f.key} className="flex flex-wrap gap-x-2">
+                <span className="font-medium text-(--amber-12)">{f.who}</span>
+                <span className="text-warning-fg">{f.reason}</span>
+              </li>
+            ))}
+            {flags.length > 8 && <li className="text-warning-fg">and {flags.length - 8} more</li>}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -333,7 +433,7 @@ function EditableName({ payout }: { payout: Payout }) {
           }
         }}
         aria-label="Payment name"
-        className="headline -mx-2 w-full max-w-xl rounded-lg bg-surface-muted px-2 py-1 text-[28px] outline-none focus:shadow-[0_0_0_2px_var(--primary)] sm:text-[34px]"
+        className="headline -mx-2 w-full max-w-xl font-normal rounded-lg bg-surface-muted px-2 py-1 text-[28px] outline-none focus:shadow-[0_0_0_2px_var(--primary)]"
       />
     );
   }
@@ -345,10 +445,10 @@ function EditableName({ payout }: { payout: Payout }) {
         setValue(payout.name);
         setEditing(true);
       }}
-      className="group -mx-2 flex max-w-full items-center gap-2 rounded-lg px-2 py-1 text-left hover:bg-surface-muted"
+      className="group -mx-2 flex max-w-full items-center gap-2 rounded-lg px-2 py-1 text-left hover:bg-surface-hover"
       title="Rename"
     >
-      <h1 className={cn("headline truncate text-[28px] sm:text-[34px]", rename.isPending && "opacity-60")}>
+      <h1 className={cn("headline truncate text-[28px] font-normal", rename.isPending && "opacity-60")}>
         {rename.isPending ? rename.variables : payout.name}
       </h1>
       <Pencil className="size-4 shrink-0 text-fg-subtle opacity-0 transition-opacity group-hover:opacity-100" />

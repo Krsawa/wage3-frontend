@@ -6,6 +6,7 @@ import { useCallback } from "react";
 import { BaseError, ContractFunctionRevertedError, UserRejectedRequestError, type Address, type Hash } from "viem";
 import { useConfig, type Config } from "wagmi";
 import {
+  getBalance,
   getConnection,
   readContract,
   switchChain,
@@ -59,6 +60,8 @@ export function useSendState(payoutId: string) {
   return all[payoutId] ?? initial;
 }
 
+export const NO_GAS_MESSAGE = `This wallet has no ETH on ${chain.name} for network fees. Add a little ETH to it, then send.`;
+
 /** Human message for wallet / chain / API errors. */
 export function describeError(error: unknown): string {
   if (error instanceof BaseError) {
@@ -74,7 +77,7 @@ export function describeError(error: unknown): string {
       return reason ? `The contract rejected this batch: ${reason}` : "The contract rejected this batch.";
     }
     if (/insufficient funds/i.test(error.message)) {
-      return `This wallet needs a little ETH on ${chain.name} to pay network fees.`;
+      return `This wallet doesn't have enough ETH on ${chain.name} for network fees. Add a little ETH, then try again.`;
     }
     if (/rejected|denied/i.test(error.message)) {
       return "You declined the request in your wallet. Nothing was sent.";
@@ -128,6 +131,9 @@ async function run(
       `This wallet has ${formatToken(balance)} but this payment needs ${formatToken(needed)}. Add USDC and try again.`,
     );
   }
+  // Wage3 doesn't pay network fees: the sender's wallet does, in ETH.
+  const eth = await getBalance(config, { address: sender, chainId: chain.id });
+  if (eth.value === BigInt(0)) throw new Error(NO_GAS_MESSAGE);
 
   if (allowance < needed) {
     update({ step: "approving", phase: "sign" });

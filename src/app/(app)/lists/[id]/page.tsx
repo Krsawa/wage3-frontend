@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, MoreHorizontal, Pencil, Send, Trash2, Users } from "lucide-react";
+import { MoreHorizontal, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -20,11 +20,14 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { Tooltip } from "@/components/ui/tooltip";
+import { ChevronLeftIcon, DeleteIcon, PeopleIcon, SendIcon } from "@/components/ui/icons";
+import { LogoField } from "@/components/ui/logo-field";
 import { useDeleteList, useList, useRenameList, useReplaceRecipients } from "@/lib/api/queries";
 import type { ListDetail } from "@/lib/api/types";
 import { LIMITS, USDC } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { formatAmount, formatRelative, pluralize, sumAmounts } from "@/lib/format";
+import { useListLogo } from "@/lib/local-prefs";
 import {
   emptyRow,
   isBlankRow,
@@ -57,13 +60,13 @@ export default function ListDetailPage() {
     if (list.error.isNotFound) {
       return (
         <EmptyState
-          icon={<Users />}
+          icon={<PeopleIcon />}
           title="List not found"
           description="It may have been deleted, or the link is wrong."
           action={
             <Button asChild variant="outline">
               <Link href="/lists">
-                <ArrowLeft className="size-4" /> Back to lists
+                <ChevronLeftIcon className="size-4" /> Back to lists
               </Link>
             </Button>
           }
@@ -107,6 +110,7 @@ function ListEditor({ list }: { list: ListDetail }) {
 
   const totalDefault = useMemo(() => sumAmounts(list.recipients.map((r) => r.default_amount)), [list.recipients]);
   const count = list.recipients.length;
+  const [logo, setLogo] = useListLogo(list.id);
 
   const discard = () => {
     const next = serverRows(list);
@@ -153,14 +157,7 @@ function ListEditor({ list }: { list: ListDetail }) {
 
   return (
     <div className="pb-16">
-      <Link
-        href="/lists"
-        className="mb-6 inline-flex items-center gap-1.5 text-[13px] font-medium text-fg-muted transition-colors duration-150 hover:text-fg"
-      >
-        <ArrowLeft className="size-3.5" /> Lists
-      </Link>
-
-      <header className="flex flex-col gap-4 pb-8 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-4 pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0 flex-1">
           <InlineName list={list} />
           <p className="mt-2.5 flex flex-wrap items-center gap-x-2 text-[15px] text-fg-muted">
@@ -182,14 +179,14 @@ function ListEditor({ list }: { list: ListDetail }) {
             <Tooltip content={dirty ? "Save your changes first" : "Add people to this list first"}>
               <span tabIndex={0} className="rounded-full">
                 <Button disabled>
-                  <Send className="size-4" /> Pay this list
+                  <SendIcon className="size-4" /> Pay this list
                 </Button>
               </span>
             </Tooltip>
           ) : (
             <Button asChild>
               <Link href={`/pay/new?list=${list.id}`}>
-                <Send className="size-4" /> Pay this list
+                <SendIcon className="size-4" /> Pay this list
               </Link>
             </Button>
           )}
@@ -200,13 +197,18 @@ function ListEditor({ list }: { list: ListDetail }) {
               </Button>
             </DropdownTrigger>
             <DropdownContent>
-              <DropdownItem tone="danger" icon={<Trash2 />} onSelect={() => setDeleteOpen(true)}>
+              <DropdownItem tone="danger" icon={<DeleteIcon />} onSelect={() => setDeleteOpen(true)}>
                 Delete list
               </DropdownItem>
             </DropdownContent>
           </DropdownMenu>
         </div>
       </header>
+
+      {/* Optional, like the company logo in Settings. Saved on this device until the API has a field. */}
+      <div className="mb-8">
+        <LogoField label="Logo (optional)" value={logo} onChange={setLogo} />
+      </div>
 
       <RecipientsEditor rows={rows} onChange={setRows} mode="list" showAllErrors={showAllErrors} />
       <p className="mt-3 text-[13px] text-fg-subtle">
@@ -331,7 +333,7 @@ function InlineName({ list }: { list: ListDetail }) {
               setError(null);
             }
           }}
-          className="headline -mx-2 w-full max-w-xl rounded-xl border border-primary bg-surface px-2 py-1 text-[28px] outline-none shadow-[0_0_0_3px_var(--primary-soft)] aria-invalid:border-danger sm:text-[34px]"
+          className="headline -mx-2 w-full max-w-xl font-normal rounded-xl border border-primary bg-surface px-2 py-1 text-[28px] outline-none shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_18%,transparent)] aria-invalid:border-danger"
         />
         {error && <p className="mt-1.5 text-[13px] text-danger-fg">{error}</p>}
       </div>
@@ -342,10 +344,10 @@ function InlineName({ list }: { list: ListDetail }) {
     <button
       type="button"
       onClick={start}
-      className="group -mx-2 flex max-w-full items-center gap-2 rounded-xl px-2 py-1 text-left transition-colors duration-150 hover:bg-surface-muted"
+      className="group -mx-2 flex max-w-full items-center gap-2 rounded-xl px-2 py-1 text-left transition-colors duration-150 hover:bg-surface-hover"
       aria-label={`Rename ${list.name}`}
     >
-      <h1 className="headline truncate text-[28px] sm:text-[34px]">{shown}</h1>
+      <h1 className="headline truncate text-[28px] font-normal">{shown}</h1>
       <Pencil className="size-4 shrink-0 text-fg-subtle opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100" />
     </button>
   );

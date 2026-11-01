@@ -1,17 +1,23 @@
 "use client";
 
 import { motion } from "motion/react";
-import { CheckCircle2, Clock, ExternalLink, Search } from "lucide-react";
+import { Clock } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { Address } from "@/components/ui/address";
+import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { BatchStatusBadge, ItemStatusBadge } from "@/components/ui/status-badge";
+import { Tooltip } from "@/components/ui/tooltip";
+import { CheckCircleIcon, DownloadIcon, ExternalIcon, SearchIcon } from "@/components/ui/icons";
 import type { Payout } from "@/lib/api/types";
 import { chain, txUrl, USDC } from "@/lib/config";
 import { cn } from "@/lib/cn";
+import { downloadPayoutCsv } from "@/lib/export-payout";
 import { formatAmount, formatDateTime, pluralize, shortAddress } from "@/lib/format";
+import { DISPLAY_FIGURE } from "@/lib/type";
 
 /** Progress hero for a payout that has started sending. */
 export function PayoutProgress({ payout }: { payout: Payout }) {
@@ -24,7 +30,7 @@ export function PayoutProgress({ payout }: { payout: Payout }) {
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-6 p-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm font-medium">
             {paid ? (
@@ -34,7 +40,7 @@ export function PayoutProgress({ payout }: { payout: Payout }) {
                 transition={{ type: "spring", duration: 0.45, bounce: 0.3 }}
                 className="text-success"
               >
-                <CheckCircle2 className="size-5" />
+                <CheckCircleIcon className="size-5" />
               </motion.span>
             ) : (
               <Clock className="size-5 text-info" />
@@ -49,9 +55,10 @@ export function PayoutProgress({ payout }: { payout: Payout }) {
                     : "Waiting to be sent"}
             </span>
           </div>
+          {/* Money in the display figure like every other amount; the one big number on the page. */}
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="headline text-[44px] tabular">{formatAmount(payout.total_amount, decimals)}</span>
-            <span className="text-lg font-medium text-fg-muted">{symbol}</span>
+            <span className={cn(DISPLAY_FIGURE, "text-[40px]")}>{formatAmount(payout.total_amount, decimals)}</span>
+            <span className="text-base text-fg-muted">{symbol}</span>
           </div>
           <div className="mt-1 text-sm text-fg-muted">
             to {pluralize(payout.recipient_count ?? payout.items.length, "person", "people")}
@@ -62,20 +69,23 @@ export function PayoutProgress({ payout }: { payout: Payout }) {
             )}
           </div>
         </div>
-        <div className="min-w-48 sm:text-right">
-          <div className="text-[13px] text-fg-muted">
-            {confirmed} of {pluralize(total, "batch", "batches")} confirmed
+        {/* Only worth showing with several transactions; for one, the status line above says it all. */}
+        {total > 1 && (
+          <div className="min-w-48 sm:text-right">
+            <div className="text-[13px] text-fg-muted">
+              {confirmed} of {total} batches confirmed
+            </div>
+            {/* Functional progress: grows to the confirmed fraction, never decorative. */}
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
+              <motion.div
+                className={cn("h-full origin-left rounded-full", paid ? "bg-success" : "bg-primary")}
+                initial={false}
+                animate={{ transform: `scaleX(${confirmed / total})` }}
+                transition={{ duration: 0.5, ease: [0.77, 0, 0.175, 1] }}
+              />
+            </div>
           </div>
-          {/* Functional progress: grows to the confirmed fraction, never decorative. */}
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
-            <motion.div
-              className={cn("h-full origin-left rounded-full", paid ? "bg-success" : "bg-primary")}
-              initial={false}
-              animate={{ transform: `scaleX(${confirmed / total})` }}
-              transition={{ duration: 0.5, ease: [0.77, 0, 0.175, 1] }}
-            />
-          </div>
-        </div>
+        )}
       </div>
     </Card>
   );
@@ -104,7 +114,7 @@ export function BatchList({ payout }: { payout: Payout }) {
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 font-mono text-[13px] text-fg-muted hover:text-fg"
                 >
-                  {shortAddress(b.tx_hash, 6)} <ExternalLink className="size-3" />
+                  {shortAddress(b.tx_hash, 6)} <ExternalIcon className="size-3" />
                 </a>
               )}
               <BatchStatusBadge status={b.status} />
@@ -138,17 +148,36 @@ export function ItemsTable({ payout }: { payout: Payout }) {
     <Card>
       <CardHeader className="items-center pb-3">
         <CardTitle>{pluralize(payout.items.length, "person", "people")}</CardTitle>
-        {payout.items.length > 8 && (
-          <div className="w-56">
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search people"
-              leading={<Search className="size-4" />}
-              className="h-9 text-sm"
-            />
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {payout.items.length > 8 && (
+            <div className="w-56">
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search people"
+                leading={<SearchIcon className="size-4" />}
+                className="h-9 text-sm"
+              />
+            </div>
+          )}
+          {/* Export where the records are: same CSV as the ⋯ menu. Only once something was sent. */}
+          {showStatus && (
+            <Tooltip content="Export CSV" align="end">
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Export CSV"
+                className="rounded-xl [corner-shape:superellipse(1.5)]"
+                onClick={() => {
+                  downloadPayoutCsv(payout);
+                  toast.success(`Exported ${pluralize(payout.items.length, "person", "people")}`);
+                }}
+              >
+                <DownloadIcon className="size-4" />
+              </Button>
+            </Tooltip>
+          )}
+        </div>
       </CardHeader>
       <div className="overflow-x-auto border-t border-border">
         <table className="w-full min-w-[560px] text-sm">
@@ -162,13 +191,13 @@ export function ItemsTable({ payout }: { payout: Payout }) {
           </thead>
           <tbody className="divide-y divide-border">
             {filtered.slice(0, visible).map((i) => (
-              <tr key={i.id}>
+              <tr key={i.id} className="group">
                 <td className="max-w-56 px-5 py-3">
                   <div className="truncate font-medium">{i.name || <span className="font-normal text-fg-subtle">No name</span>}</div>
                   {i.email && <div className="truncate text-xs text-fg-subtle">{i.email}</div>}
                 </td>
                 <td className="px-3 py-3">
-                  <Address value={i.wallet_address} />
+                  <Address value={i.wallet_address} showActions="hover" />
                 </td>
                 <td className="px-3 py-3 text-right font-mono text-[13px] tabular">{formatAmount(i.amount, decimals)}</td>
                 {showStatus && (
