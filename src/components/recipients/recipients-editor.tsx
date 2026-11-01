@@ -758,7 +758,7 @@ function Cell({
   selected?: boolean;
 }) {
   return (
-    <div className="relative min-w-0">
+    <div className="min-w-0">
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -778,26 +778,10 @@ function Cell({
           // Invalid: red fill and a red border (the red scale's border step), on desktop too
           // where table cells are otherwise borderless.
           error && "border-(--red-7) bg-danger-soft/60 text-danger-fg md:border-(--red-7) md:bg-danger-soft/50",
-          // Desktop: the message sits inside the cell's bottom edge, so the value moves up and the
-          // row keeps its 44px height whatever the fault. While editing, the message steps aside and
-          // the value returns to centre.
-          (error || warning) && "peer md:pb-3.5 md:focus:pb-0",
           className,
         )}
         {...props}
       />
-      {(error || warning) && (
-        <p
-          className={cn(
-            "px-1 pt-1 pb-0.5 text-xs peer-focus:hidden",
-            "md:pointer-events-none md:absolute md:inset-x-3 md:bottom-1.5 md:truncate md:p-0 md:text-[11px] md:leading-[14px]",
-            align === "right" && "md:text-right",
-            error ? "text-danger-fg" : "text-warning-fg",
-          )}
-        >
-          {error ?? warning}
-        </p>
-      )}
     </div>
   );
 }
