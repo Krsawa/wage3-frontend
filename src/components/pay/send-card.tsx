@@ -1,21 +1,24 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { AlertTriangle, Check, ExternalLink, Lock, PenLine, Send, ShieldCheck, Wallet } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { useConnection, useSwitchChain } from "wagmi";
+import { useBalance, useConnection, useSwitchChain } from "wagmi";
 
 import { usePaymentsPaused } from "@/components/shell/status-banner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { InfoTip } from "@/components/ui/tooltip";
 import { ConnectDialog } from "@/components/wallet/connect-dialog";
 import { useUsdcBalance } from "@/components/wallet/wallet-button";
+import { CheckIcon, ExternalIcon, LockIcon, PaperPlaneIcon, ShieldCheckIcon } from "@/components/ui/icons";
 import type { Payout } from "@/lib/api/types";
 import { chain, LIMITS, txUrl, USDC } from "@/lib/config";
 import { cn } from "@/lib/cn";
-import { formatAmount, pluralize, shortAddress } from "@/lib/format";
-import type { SendState } from "@/lib/send-payout";
+import { formatAmount, parseAmount, pluralize, shortAddress } from "@/lib/format";
+import { NO_GAS_MESSAGE, type SendState } from "@/lib/send-payout";
+import { DISPLAY_FIGURE } from "@/lib/type";
 
 type StepStatus = "todo" | "active" | "done" | "error";
 
@@ -32,6 +35,7 @@ export function SendCard({
   onRetry,
   disabledReason,
   sendLabel = "Send payment",
+  requireTypedTotal = false,
 }: {
   payout: Payout;
   total: bigint;
@@ -42,12 +46,16 @@ export function SendCard({
   /** e.g. "Fix 2 rows first". Shown under the button. */
   disabledReason?: string | null;
   sendLabel?: string;
+  /** Large payment: the sender types the total before the button unlocks. */
+  requireTypedTotal?: boolean;
 }) {
   const { address, isConnected, chainId } = useConnection();
   const { switchChain, isPending: switching } = useSwitchChain();
   const { paused, message: pausedMessage } = usePaymentsPaused();
   const balance = useUsdcBalance();
+  const eth = useBalance({ address, chainId: chain.id, query: { enabled: !!address, refetchInterval: 15_000 } });
   const [connectOpen, setConnectOpen] = useState(false);
+  const [typed, setTyped] = useState("");
 
   const remaining = payout.batches.filter((b) => b.status === "ready");
   const remainingTotal = payout.status === "draft" ? total : remaining.reduce((a, b) => a + BigInt(b.total_amount), BigInt(0));
@@ -58,15 +66,21 @@ export function SendCard({
     !!payout.sender_address && !!address && payout.sender_address.toLowerCase() !== address.toLowerCase();
   const wrongChain = isConnected && chainId !== chain.id;
   const short = balance.data !== undefined && balance.data < remainingTotal;
+  const noGas = eth.data !== undefined && eth.data.value === BigInt(0);
   const busy = !["idle", "done", "error"].includes(state.step);
   const started = state.step !== "idle";
+  const needsTyping = requireTypedTotal && payout.status === "draft" && !started;
+  const typedAmount = parseAmount(typed);
+  const typedOk = typedAmount.ok && BigInt(typedAmount.value) === remainingTotal;
+  const blockedReason =
+    disabledReason ?? (short ? `Not enough ${USDC.symbol} in this wallet.` : noGas ? NO_GAS_MESSAGE : null);
 
   const steps: { key: string; label: ReactNode; detail?: ReactNode; status: StepStatus; icon: ReactNode }[] = [
     {
       key: "lock",
       label: "Lock payment",
       detail: "Amounts can't change after this",
-      icon: <Lock className="size-3.5" />,
+      icon: <LockIcon className="size-3.5" />,
       status:
         state.step === "preparing" || state.step === "switching"
           ? "active"
@@ -78,14 +92,14 @@ export function SendCard({
     },
     {
       key: "approve",
-      label: `Approve ${USDC.symbol}`,
+      label: `Confirm ${USDC.symbol}`,
       detail:
         state.step === "approving"
           ? state.phase === "sign"
             ? "Confirm in your wallet"
             : "Waiting for Base…"
           : `Lets the batcher move exactly ${formatAmount(remainingTotal)} ${USDC.symbol}`,
-      icon: <ShieldCheck className="size-3.5" />,
+      icon: <ShieldCheckIcon className="size-3.5" />,
       status:
         state.step === "checking" || state.step === "approving"
           ? "active"
@@ -109,7 +123,7 @@ export function SendCard({
           : batchCount > 1
             ? `Up to ${LIMITS.batchSize} people per transaction`
             : "One transaction for everyone",
-      icon: <Send className="size-3.5" />,
+      icon: <PaperPlaneIcon className="size-3.5" />,
       status:
         state.step === "sending"
           ? "active"
@@ -128,7 +142,7 @@ export function SendCard({
     action = (
       <>
         <Button size="lg" className="w-full" onClick={() => setConnectOpen(true)}>
-          <Wallet className="size-4.5" /> Connect wallet to send
+          Connect wallet to send
         </Button>
         <ConnectDialog open={connectOpen} onOpenChange={setConnectOpen} />
       </>
@@ -149,20 +163,31 @@ export function SendCard({
   } else {
     action = (
       <>
+        {needsTyping && (
+          <label className="flex flex-col gap-1.5 text-[13px] text-fg-muted">
+            <span className="text-pretty">
+              This is larger than you usually send. Type <span className="font-medium text-fg tabular">{formatAmount(remainingTotal)}</span> to confirm.
+            </span>
+            <input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value.replace(/[^\d.,]/g, ""))}
+              inputMode="decimal"
+              placeholder={formatAmount(remainingTotal)}
+              aria-label="Type the total to confirm"
+              className="h-10 rounded-lg border border-border bg-surface px-3 font-mono text-sm text-fg tabular outline-none focus:border-primary"
+            />
+          </label>
+        )}
         <Button
           size="lg"
           className="w-full"
           onClick={state.step === "error" ? onRetry : onSend}
           loading={busy}
-          disabled={!!disabledReason || short || count === 0}
+          disabled={!!blockedReason || count === 0 || (needsTyping && !typedOk)}
         >
           {state.step === "error" ? "Try again" : started && payout.status !== "draft" ? "Continue sending" : sendLabel}
         </Button>
-        {(disabledReason || short) && (
-          <p className="text-center text-[13px] text-fg-muted">
-            {disabledReason ?? `Not enough ${USDC.symbol} in this wallet.`}
-          </p>
-        )}
+        {blockedReason && <p className="text-center text-[13px] text-fg-muted text-pretty">{blockedReason}</p>}
       </>
     );
   }
@@ -170,66 +195,70 @@ export function SendCard({
   return (
     <Card className="overflow-hidden">
       <div className="p-5">
-        <div className="text-[13px] text-fg-muted">{payout.status === "draft" ? "You're sending" : "Left to send"}</div>
+        <div className="text-[13px] font-medium text-fg-muted">{payout.status === "draft" ? "You're sending" : "Left to send"}</div>
         <div className="mt-1 flex items-baseline gap-2">
-          <span className="headline text-[40px] tabular">{formatAmount(remainingTotal)}</span>
-          <span className="text-lg font-medium text-fg-muted">{USDC.symbol}</span>
+          <span className={cn(DISPLAY_FIGURE, "text-[24px]")}>{formatAmount(remainingTotal)}</span>
+          <span className="text-sm text-fg-muted">{USDC.symbol}</span>
         </div>
-        <dl className="mt-5 grid grid-cols-2 gap-y-3 text-[13px]">
+        {/* Same rows as the New payment summary: label left, value right. */}
+        <dl className="mt-5 flex flex-col gap-2.5 text-[13px]">
           <Meta label="Recipients">{pluralize(count, "person", "people")}</Meta>
+          <Meta label="Wallet prompts" info={<WalletPromptsInfo />}>Up to {signatures}</Meta>
           <Meta label="Network">
             <span className="inline-flex items-center gap-1.5">
               <span className="size-2.5 rounded-[3px] bg-base-blue" />
               {chain.name}
             </span>
           </Meta>
-          <Meta label="Signatures">Up to {signatures}</Meta>
-          <Meta label="Your balance">
-            {!isConnected ? (
-              <span className="text-fg-subtle">—</span>
-            ) : balance.isLoading ? (
-              <span className="text-fg-subtle">…</span>
-            ) : (
-              <span className={cn("tabular", short && "text-danger-fg")}>
-                {formatAmount(balance.data ?? BigInt(0))} {USDC.symbol}
-              </span>
-            )}
-          </Meta>
+          {/* Only once there's a wallet to read: a bare dash beside the label says nothing. */}
+          {isConnected && (
+            <Meta label="Your balance">
+              {balance.isLoading ? (
+                <span className="text-fg-subtle">…</span>
+              ) : (
+                <span className={cn("tabular", short && "text-danger-fg")}>
+                  {formatAmount(balance.data ?? BigInt(0))} {USDC.symbol}
+                </span>
+              )}
+            </Meta>
+          )}
         </dl>
       </div>
 
-      <ol className="border-t border-border px-5 py-4">
+      <ol className="px-5 pb-5">
         {steps.map(({ key, ...s }, i) => (
           <Step key={key} {...s} last={i === steps.length - 1} />
         ))}
       </ol>
 
-      <div className="flex flex-col gap-2.5 border-t border-border bg-surface-sunken p-5">
-        <AnimatePresence initial={false}>
-          {state.step === "error" && state.error && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
+      <div className="flex flex-col gap-4 bg-surface-sunken p-5">
+        <div className="flex flex-col gap-2.5">
+          <AnimatePresence initial={false}>
+            {state.step === "error" && state.error && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <Notice tone="danger">{state.error}</Notice>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {action}
+          {state.approveHash && (
+            <a
+              href={txUrl(state.approveHash)}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center gap-1 text-xs text-fg-subtle hover:text-fg"
             >
-              <Notice tone="danger">{state.error}</Notice>
-            </motion.div>
+              Approval transaction <ExternalIcon className="size-3" />
+            </a>
           )}
-        </AnimatePresence>
-        {action}
-        {state.approveHash && (
-          <a
-            href={txUrl(state.approveHash)}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center justify-center gap-1 text-xs text-fg-subtle hover:text-fg"
-          >
-            Approval transaction <ExternalLink className="size-3" />
-          </a>
-        )}
-        <p className="flex items-start justify-center gap-1.5 text-center text-xs text-fg-subtle text-pretty">
-          <PenLine className="mt-px size-3 shrink-0" />
+        </div>
+        {/* Set apart from the action, centred like the note on New payment. */}
+        <p className="text-center text-xs text-balance text-fg-subtle">
           Wage3 never holds your funds. {USDC.symbol} goes straight from your wallet to each person.
         </p>
       </div>
@@ -237,11 +266,14 @@ export function SendCard({
   );
 }
 
-function Meta({ label, children }: { label: string; children: ReactNode }) {
+function Meta({ label, info, children }: { label: string; info?: ReactNode; children: ReactNode }) {
   return (
-    <div>
-      <dt className="text-fg-subtle">{label}</dt>
-      <dd className="mt-0.5 font-medium">{children}</dd>
+    <div className="flex items-center justify-between gap-3">
+      <dt className="flex items-center gap-1 text-fg-subtle">
+        {label}
+        {info && <InfoTip label={label} align="start">{info}</InfoTip>}
+      </dt>
+      <dd className="font-medium">{children}</dd>
     </div>
   );
 }
@@ -257,13 +289,14 @@ function Step({ label, detail, status, icon, last }: { label: ReactNode; detail?
           )}
         />
       )}
+      {/* Just the glyph, coloured by state; no circle around it. */}
       <span
         className={cn(
-          "relative grid size-7 shrink-0 place-items-center rounded-full border transition-[background-color,border-color,color] duration-200",
-          status === "done" && "border-success bg-success text-white",
-          status === "active" && "border-primary bg-primary-soft text-primary",
-          status === "error" && "border-danger bg-danger-soft text-danger-fg",
-          status === "todo" && "border-border bg-surface text-fg-subtle",
+          "relative grid size-7 shrink-0 place-items-center transition-colors duration-200 [&_svg]:size-4",
+          status === "done" && "text-success",
+          status === "active" && "text-primary",
+          status === "error" && "text-danger-fg",
+          status === "todo" && "text-fg-subtle",
         )}
       >
         <AnimatePresence mode="popLayout" initial={false}>
@@ -276,7 +309,7 @@ function Step({ label, detail, status, icon, last }: { label: ReactNode; detail?
             className="grid place-items-center"
           >
             {status === "done" ? (
-              <Check className="size-3.5" strokeWidth={3} />
+              <CheckIcon className="size-4" strokeWidth={2.5} />
             ) : status === "active" ? (
               <Spinner className="size-3.5" />
             ) : status === "error" ? (
@@ -307,5 +340,15 @@ function Notice({ tone, children }: { tone: "warning" | "danger"; children: Reac
       <AlertTriangle className="mt-px size-4 shrink-0" />
       <div>{children}</div>
     </div>
+  );
+}
+
+/** What "Wallet prompts" counts. Shared with the New payment summary. */
+export function WalletPromptsInfo() {
+  return (
+    <>
+      One to confirm the exact {USDC.symbol} total, then one per transaction of up to {LIMITS.batchSize} people. Your
+      wallet asks you to approve each.
+    </>
   );
 }

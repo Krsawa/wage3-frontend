@@ -1,7 +1,6 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Equal, FileUp, Plus, Split, Trash2, Upload, X } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -11,13 +10,17 @@ import {
   type ClipboardEvent,
   type KeyboardEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
+import { useConnection } from "wagmi";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip } from "@/components/ui/tooltip";
+import { ChevronLeftIcon, CloseIcon, DeleteIcon, EqualIcon, FileIcon, ImportIcon, PlusIcon, ShiftIcon, SplitIcon } from "@/components/ui/icons";
 import { useRowSelection } from "@/hooks/use-row-selection";
+import { useHydrated } from "@/lib/auth/use-session";
 import { LIMITS, USDC } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { formatAmount, parseAmount, pluralize, toInputAmount } from "@/lib/format";
@@ -47,6 +50,7 @@ export function RecipientsEditor({
   mode,
   showAllErrors = false,
   disabled = false,
+  flush = false,
   max = mode === "list" ? LIMITS.listRecipients : LIMITS.payoutItems,
 }: {
   rows: RecipientRow[];
@@ -55,6 +59,11 @@ export function RecipientsEditor({
   /** Set after a failed submit, so untouched fields show their errors too. */
   showAllErrors?: boolean;
   disabled?: boolean;
+  /**
+   * Inside a card with 20px padding: the table runs to the card's edges instead of a nested box.
+   * `true` rules it top and bottom (more content follows); "end" also runs it off the card's bottom.
+   */
+  flush?: boolean | "end";
   max?: number;
 }) {
   const [touched, setTouched] = useState<Set<string>>(new Set());
@@ -65,6 +74,7 @@ export function RecipientsEditor({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { errors, duplicates, filledCount } = useMemo(() => validateRows(rows, mode), [rows, mode]);
+  const ownWallet = useConnection().address?.toLowerCase();
   const total = useMemo(() => rowsTotal(rows), [rows]);
   const atLimit = filledCount >= max;
 
@@ -179,13 +189,12 @@ export function RecipientsEditor({
     if (bulk === "same") {
       amounts = bulkTargets.map(() => toInputAmount(parsed.value));
     } else {
-      // Split in base units; the remainder goes one unit at a time to the first rows.
-      const totalUnits = BigInt(parsed.value);
-      const n = BigInt(bulkTargets.length);
-      const each = totalUnits / n;
+      const { each, leftover } = splitEvenly(BigInt(parsed.value), bulkTargets.length);
       if (each === BigInt(0)) return "That total is too small to split";
-      const rem = Number(totalUnits % n);
-      amounts = bulkTargets.map((_, i) => toInputAmount((each + (i < rem ? BigInt(1) : BigInt(0))).toString()));
+      amounts = bulkTargets.map(() => toInputAmount(each.toString()));
+      if (leftover > BigInt(0)) {
+        toast(`${formatAmount(leftover)} ${USDC.symbol} wasn't assigned (rounding to the cent).`);
+      }
     }
     const byKey = new Map(bulkTargets.map((r, i) => [r.key, amounts[i]]));
     onChange(rows.map((r) => (byKey.has(r.key) ? { ...r, amount: byKey.get(r.key)! } : r)));
@@ -196,6 +205,13 @@ export function RecipientsEditor({
   const shown = rows.slice(0, visible);
   const amountLabel = mode === "list" ? "Default amount" : "Amount";
   const selecting = sel.count > 0;
+  // Entering or leaving a selection changes who a bulk amount applies to, so close any open form.
+  const [wasSelecting, setWasSelecting] = useState(selecting);
+  if (wasSelecting !== selecting) {
+    setWasSelecting(selecting);
+    setBulk(null);
+  }
+  const hydrated = useHydrated();
 
   return (
     <div
@@ -205,92 +221,67 @@ export function RecipientsEditor({
         if (e.key === "Escape" && selecting) sel.clear();
       }}
     >
-      {/* Toolbar: totals + tools, or the selection actions while rows are ticked */}
-      <div className="relative min-h-12 pb-4">
-        <AnimatePresence mode="popLayout" initial={false}>
-          {selecting && !disabled ? (
-            <motion.div
-              key="selection"
-              initial={{ opacity: 0, transform: "translateY(4px)" }}
-              animate={{ opacity: 1, transform: "translateY(0px)" }}
-              exit={{ opacity: 0, transform: "translateY(-4px)", transition: { duration: 0.12 } }}
-              transition={{ duration: 0.18 }}
-              className="flex flex-wrap items-center gap-1.5 rounded-full bg-inverse py-1 pr-1 pl-4 text-inverse-fg"
-            >
-              <span className="mr-auto text-sm font-medium tabular">
-                {pluralize(sel.count, "person", "people")} selected
-                <span className="ml-2 font-normal opacity-60">
-                  {formatAmount(rowsTotal(bulkTargets))} {USDC.symbol}
-                </span>
-              </span>
-              <SelectionAction icon={<Equal />} onClick={() => setBulk(bulk === "same" ? null : "same")} active={bulk === "same"}>
-                Set amount
-              </SelectionAction>
-              <SelectionAction icon={<Split />} onClick={() => setBulk(bulk === "split" ? null : "split")} active={bulk === "split"}>
-                Split total
-              </SelectionAction>
-              <SelectionAction icon={<Trash2 />} onClick={removeSelected} tone="danger">
-                Remove
-              </SelectionAction>
-              <Tooltip content="Clear selection (Esc)">
-                <button
-                  type="button"
-                  onClick={() => sel.clear()}
-                  className="pressable grid size-8 place-items-center rounded-full hover:bg-white/15"
-                  aria-label="Clear selection"
-                >
-                  <X className="size-4" />
-                </button>
-              </Tooltip>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="tools"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transition: { duration: 0.1 } }}
-              className="flex flex-wrap items-center gap-2"
-            >
-              <div className="mr-auto flex items-baseline gap-3">
-                <span className="text-sm font-medium">{pluralize(filledCount, "person", "people")}</span>
-                {total > BigInt(0) && (
-                  <span className="text-sm text-fg-muted tabular">
-                    {formatAmount(total)} {USDC.symbol}
-                  </span>
-                )}
-              </div>
-              {!disabled && (
-                <>
-                  <Button variant="ghost" size="sm" onClick={() => setBulk(bulk === "same" ? null : "same")} disabled={!filledCount}>
-                    <Equal className="size-4" /> Same amount
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setBulk(bulk === "split" ? null : "split")} disabled={!filledCount}>
-                    <Split className="size-4" /> Split total
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-                    <FileUp className="size-4" /> Import CSV
-                  </Button>
-                </>
-              )}
-            </motion.div>
+      {/* Toolbar: totals + tools. Selection actions live in the toast below. */}
+      <div className="flex min-h-12 flex-wrap items-center gap-2 pb-4">
+        <div className="mr-auto flex items-baseline gap-3">
+          <span className="text-sm font-medium">{pluralize(filledCount, "person", "people")}</span>
+          {total > BigInt(0) && (
+            <span className="text-sm text-fg-muted tabular">
+              {formatAmount(total)} {USDC.symbol}
+            </span>
           )}
-        </AnimatePresence>
+        </div>
+        {!disabled && (
+          <>
+            {filledCount > 0 && (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => setBulk(bulk === "same" ? null : "same")}>
+                  <EqualIcon className="size-4" /> Same amount
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setBulk(bulk === "split" ? null : "split")}>
+                  <SplitIcon className="size-4" /> Split total
+                </Button>
+              </>
+            )}
+            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+              <ImportIcon className="size-4" /> Import CSV
+            </Button>
+          </>
+        )}
       </div>
 
+      {hydrated &&
+        createPortal(
+          <AnimatePresence>
+            {selecting && !disabled && (
+              <SelectionToast
+                count={sel.count}
+                total={rowsTotal(bulkTargets)}
+                bulk={bulk}
+                onBulk={setBulk}
+                onApply={applyBulk}
+                onRemove={removeSelected}
+                onClear={() => sel.clear()}
+              />
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
+
       <AnimatePresence initial={false}>
-        {bulk && (
+        {bulk && !selecting && (
           <BulkBar
-            key={`${bulk}-${selecting}`}
+            key={bulk}
             kind={bulk}
             count={bulkTargets.length}
-            scoped={selecting}
+            scoped={false}
             onApply={applyBulk}
             onClose={() => setBulk(null)}
           />
         )}
       </AnimatePresence>
 
-      {/* Nobody yet: make the CSV route obvious. */}
+      {/* Nobody yet: one quiet line for the CSV route. Desktop only: phones can't drag files in. */}
       <AnimatePresence initial={false}>
         {filledCount === 0 && !disabled && (
           <motion.button
@@ -299,17 +290,13 @@ export function RecipientsEditor({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0, transition: { duration: 0.15 } }}
-            className="group overflow-hidden text-left"
+            className="group hidden overflow-hidden text-left md:block"
           >
-            <div className="mb-4 flex items-center gap-4 rounded-2xl border-2 border-dashed border-border px-5 py-5 transition-colors duration-150 group-hover:border-border-strong group-hover:bg-surface-sunken">
-              <span className="grid size-11 shrink-0 place-items-center rounded-full bg-surface-muted text-fg-muted">
-                <Upload className="size-5" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-medium">Drop a CSV anywhere on this page</span>
-                <span className="mt-0.5 block text-[13px] text-fg-muted">
-                  You&apos;ll pick who to add before anything changes. Or click to choose a file, or add people one by one below.
-                </span>
+            <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-dashed border-border px-4 py-3 text-[13px] text-fg-muted transition-colors duration-150 group-hover:bg-surface-hover">
+              <FileIcon className="size-4 shrink-0" />
+              <span>
+                Drop a CSV anywhere on this page, or <span className="font-medium text-fg">choose a file</span>.
+                You&apos;ll pick who to add before anything changes.
               </span>
             </div>
           </motion.button>
@@ -317,8 +304,18 @@ export function RecipientsEditor({
       </AnimatePresence>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-2xl border border-border">
-        <div className={cn("hidden gap-px border-b border-border bg-surface-sunken text-xs font-medium text-fg-subtle md:grid", GRID)}>
+      <div
+        className={cn(
+          flush === "end" ? "-mx-5 -mb-5 border-t border-border" : flush ? "-mx-5 border-y border-border" : "overflow-hidden rounded-2xl border border-border",
+        )}
+      >
+        <div
+          className={cn(
+            "hidden gap-px border-b border-border bg-surface-sunken text-xs font-medium text-fg-subtle md:grid",
+            GRID,
+            flush && "md:pl-1.5",
+          )}
+        >
           <span className="flex items-center justify-center py-2.5">
             {!disabled && (
               <Checkbox
@@ -334,7 +331,7 @@ export function RecipientsEditor({
           <span className="px-3 py-2.5">Name</span>
           <span className="px-3 py-2.5">Email</span>
           <span className="px-3 py-2.5">Wallet address</span>
-          <span className="px-3 py-2.5 text-right">
+          <span className="px-3 py-2.5 text-right whitespace-nowrap">
             {amountLabel} <span className="text-fg-subtle/70">({USDC.symbol})</span>
           </span>
           <span />
@@ -354,12 +351,13 @@ export function RecipientsEditor({
                   exit={{ opacity: 0, transition: { duration: 0.1 } }}
                   transition={{ duration: 0.18 }}
                   className={cn(
-                    "group grid grid-cols-[1.75rem_1fr_2.5rem] gap-x-2 gap-y-1 p-3 transition-colors duration-100 md:items-start md:gap-0 md:p-0",
+                    "group grid grid-cols-[minmax(0,1fr)_2.5rem] gap-x-2 gap-y-1 p-3 transition-colors duration-100 md:items-start md:gap-0 md:p-0",
                     GRID,
-                    checked && "bg-primary-soft/60",
+                    flush && "px-5 md:pl-1.5",
                   )}
                 >
-                  <span className="row-span-3 flex justify-center pt-2.5 md:row-span-1 md:pt-3.5">
+                  {/* Selection is desktop only: on phones the bulk tools apply to everyone. */}
+                  <span className="hidden justify-center md:flex md:pt-3.5">
                     {!disabled && !blank && (
                       <Checkbox
                         checked={checked}
@@ -368,9 +366,12 @@ export function RecipientsEditor({
                       />
                     )}
                   </span>
-                  <span className="hidden pt-3 pr-2 text-right text-xs text-fg-subtle tabular md:block">{i + 1}</span>
+                  <span className={cn("hidden pt-3 pr-2 text-right text-xs tabular md:block", checked ? "text-(--blue-11)" : "text-fg-subtle")}>
+                    {i + 1}
+                  </span>
                   <div className="grid grid-cols-2 gap-2 md:contents">
                     <Cell
+                      selected={checked}
                       value={r.name}
                       placeholder="Name"
                       error={errorFor(r.key, "name")}
@@ -381,8 +382,9 @@ export function RecipientsEditor({
                       autoComplete="off"
                     />
                     <Cell
+                      selected={checked}
                       value={r.email}
-                      placeholder="Email (optional)"
+                      placeholder="Email"
                       type="email"
                       error={errorFor(r.key, "email")}
                       disabled={disabled}
@@ -392,13 +394,22 @@ export function RecipientsEditor({
                       autoComplete="off"
                     />
                   </div>
-                  <div className="col-start-2 md:contents">
+                  <div className="col-start-1 md:contents">
                     <Cell
+                      selected={checked}
                       value={r.wallet}
                       placeholder="0x…"
                       mono
                       error={errorFor(r.key, "wallet")}
-                      warning={duplicates.has(r.key) && mode === "payout" ? "Paid twice in this payment" : undefined}
+                      warning={
+                        mode !== "payout"
+                          ? undefined
+                          : duplicates.has(r.key)
+                            ? "Paid twice in this payment"
+                            : ownWallet && r.wallet.trim().toLowerCase() === ownWallet
+                              ? "This is your connected wallet"
+                              : undefined
+                      }
                       disabled={disabled}
                       onChange={(v) => update(r.key, "wallet", v)}
                       onBlur={() => touch(r.key, "wallet")}
@@ -407,8 +418,9 @@ export function RecipientsEditor({
                       autoComplete="off"
                     />
                   </div>
-                  <div className="col-start-2 md:contents">
+                  <div className="col-start-1 md:contents">
                     <Cell
+                      selected={checked}
                       value={r.amount}
                       placeholder={mode === "list" ? "Optional" : "0.00"}
                       inputMode="decimal"
@@ -422,7 +434,7 @@ export function RecipientsEditor({
                     />
                   </div>
                   {!disabled ? (
-                    <div className="col-start-3 row-span-3 row-start-1 flex justify-end md:col-auto md:row-auto md:row-span-1 md:justify-center md:pt-1.5">
+                    <div className="col-start-2 row-span-3 row-start-1 flex justify-end md:col-auto md:row-auto md:row-span-1 md:justify-center md:pt-1.5">
                       <Tooltip content="Remove">
                         <button
                           type="button"
@@ -430,7 +442,7 @@ export function RecipientsEditor({
                           className="pressable grid size-8 place-items-center rounded-lg text-fg-subtle opacity-100 hover:bg-danger-soft hover:text-danger-fg md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
                           aria-label={`Remove row ${i + 1}`}
                         >
-                          <Trash2 className="size-4" />
+                          <DeleteIcon className="size-4" />
                         </button>
                       </Tooltip>
                     </div>
@@ -458,11 +470,15 @@ export function RecipientsEditor({
             type="button"
             onClick={addRow}
             disabled={atLimit}
-            className="flex w-full items-center gap-2 border-t border-border px-4 py-3 text-sm font-medium text-fg-muted transition-colors duration-150 hover:bg-surface-sunken hover:text-fg disabled:opacity-45"
+            className={cn(
+              "flex w-full items-center gap-2 border-t border-border py-3 text-sm font-medium text-fg-muted transition-colors duration-150 hover:bg-surface-hover hover:text-fg disabled:opacity-45",
+              flush ? "px-5" : "px-4",
+            )}
           >
-            <Plus className="size-4" /> Add person
+            <PlusIcon className="size-4" /> Add person
             <span className="ml-auto hidden text-xs font-normal text-fg-subtle sm:inline">
-              Tip: shift-click to select a range, or paste rows from a spreadsheet
+              Tip: <Kbd><ShiftIcon className="size-3" aria-hidden={false} aria-label="Shift" role="img" /></Kbd> click to select a range,
+              or <Kbd>⌘</Kbd><Kbd>V</Kbd> to paste rows from a spreadsheet
             </span>
           </button>
         )}
@@ -563,7 +579,7 @@ function PageDropOverlay({ active }: { active: boolean }) {
               className="flex flex-col items-center text-center"
             >
               <span className="grid size-14 place-items-center rounded-2xl bg-primary text-primary-fg">
-                <Upload className="size-6" />
+                <FileIcon className="size-6" />
               </span>
               <span className="mt-4 text-lg font-semibold tracking-[-0.02em]">Drop to import people</span>
               <span className="mt-1 text-sm text-fg-muted">CSV with name, email, wallet and amount columns</span>
@@ -575,30 +591,109 @@ function PageDropOverlay({ active }: { active: boolean }) {
   );
 }
 
-function SelectionAction({
-  icon,
-  children,
-  onClick,
-  active,
-  tone,
+/** A key as a small keycap, read inline with the tip around it. */
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="mx-px inline-grid h-[18px] min-w-[18px] place-items-center rounded-[5px] bg-surface px-1 align-middle font-sans text-[11px] leading-none font-medium text-fg-muted shadow-(--shadow-xs) [text-box:trim-both_cap_alphabetic]">
+      {children}
+    </kbd>
+  );
+}
+
+// Dark grey, a step up from the #111 blacks (user's call over blue 10). White on it is about 15:1.
+const TOAST_BG = "bg-[oklch(0.25_0_0)]";
+
+/**
+ * Selection as a toast, after X's iOS toasts: a solid dark card that rises from the bottom,
+ * says what's selected, and updates in place as rows are ticked. Picking Set amount or
+ * Split total turns the same toast into the amount form, so it stays in view on long lists.
+ */
+function SelectionToast({
+  count,
+  total,
+  bulk,
+  onBulk,
+  onApply,
+  onRemove,
+  onClear,
 }: {
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  onClick: () => void;
-  active?: boolean;
-  tone?: "danger";
+  count: number;
+  total: bigint;
+  bulk: null | "same" | "split";
+  onBulk: (b: null | "same" | "split") => void;
+  onApply: (value: string) => string | null;
+  onRemove: () => void;
+  onClear: () => void;
 }) {
+  return (
+    // Centred on the content panel: the desktop sidebar is 240px.
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:pl-60">
+      <motion.div
+        role="status"
+        layout
+        initial={{ opacity: 0, transform: "translateY(24px)" }}
+        animate={{ opacity: 1, transform: "translateY(0px)" }}
+        exit={{ opacity: 0, transform: "translateY(16px)", transition: { duration: 0.15 } }}
+        transition={{ type: "spring", duration: 0.35, bounce: 0.15 }}
+        className={cn(
+          "pointer-events-auto flex min-h-13 w-full max-w-[560px] items-center gap-1 rounded-[14px] py-2 pr-2 pl-4 text-white shadow-lg",
+          TOAST_BG,
+        )}
+      >
+        {bulk ? (
+          <motion.div layout="position" key="form" className="flex-1">
+            <BulkBar kind={bulk} count={count} scoped tone="toast" onApply={onApply} onClose={() => onBulk(null)} />
+          </motion.div>
+        ) : (
+          <motion.div layout="position" key="summary" className="flex min-w-0 flex-1 items-center gap-1">
+            <p className="mr-auto flex min-w-0 items-baseline gap-1 text-[15px] font-medium tabular">
+              {/* The count rolls rather than swapping, so adding people reads as one toast updating. */}
+              <span className="relative inline-flex overflow-hidden">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.span
+                    key={count}
+                    initial={{ opacity: 0, transform: "translateY(60%)" }}
+                    animate={{ opacity: 1, transform: "translateY(0%)" }}
+                    exit={{ opacity: 0, transform: "translateY(-60%)" }}
+                    transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+                  >
+                    {count.toLocaleString()}
+                  </motion.span>
+                </AnimatePresence>
+              </span>
+              <span>selected</span>
+              <span className="ml-1 truncate text-[13px] font-normal text-white/75">
+                {formatAmount(total)} {USDC.symbol}
+              </span>
+            </p>
+            <ToastAction onClick={() => onBulk("same")}>Set amount</ToastAction>
+            <ToastAction onClick={() => onBulk("split")}>Split</ToastAction>
+            <ToastAction onClick={onRemove}>Remove</ToastAction>
+            <Tooltip content="Clear selection (Esc)">
+              <button
+                type="button"
+                onClick={onClear}
+                className="pressable grid size-9 place-items-center rounded-[10px] text-white/80 hover:bg-white/15 hover:text-white"
+                aria-label="Clear selection"
+              >
+                <CloseIcon className="size-4" />
+              </button>
+            </Tooltip>
+          </motion.div>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
+/** Bold white text action, like the "View" on X's toasts. */
+function ToastAction({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        "pressable inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium [&_svg]:size-3.5",
-        active ? "bg-white/20" : "hover:bg-white/15",
-        tone === "danger" && "hover:bg-danger hover:text-white",
-      )}
+      className="pressable h-9 shrink-0 rounded-[10px] px-2.5 text-[14px] font-semibold whitespace-nowrap hover:bg-white/15"
     >
-      {icon}
       {children}
     </button>
   );
@@ -611,6 +706,7 @@ function Cell({
   warning,
   mono,
   align,
+  selected,
   className,
   ...props
 }: Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange" | "value"> & {
@@ -620,6 +716,8 @@ function Cell({
   warning?: string;
   mono?: boolean;
   align?: "right";
+  /** Row is ticked: the text turns a darker step of the selection blue (no row fill). */
+  selected?: boolean;
 }) {
   return (
     <div className="min-w-0">
@@ -631,11 +729,14 @@ function Cell({
         className={cn(
           "h-10 w-full min-w-0 rounded-lg border border-border bg-surface px-3 text-sm outline-none transition-[border-color,box-shadow,background-color] duration-150",
           "md:h-11 md:rounded-none md:border-transparent md:bg-transparent",
-          "hover:bg-surface-sunken focus:border-primary focus:bg-surface focus:shadow-[inset_0_0_0_1px_var(--primary)] md:focus:border-transparent",
+          "hover:bg-surface-hover focus:border-primary focus:bg-surface focus:shadow-[inset_0_0_0_1px_var(--primary)] md:focus:border-transparent",
           "placeholder:text-fg-subtle/80 disabled:cursor-default disabled:hover:bg-transparent",
           mono && "font-mono text-[13px] tabular",
           align === "right" && "md:text-right",
-          error && "bg-danger-soft/60 text-danger-fg md:bg-danger-soft/50",
+          selected && "text-(--blue-11)",
+          // Invalid: red fill and a red border (the red scale's border step), on desktop too
+          // where table cells are otherwise borderless.
+          error && "border-(--red-7) bg-danger-soft/60 text-danger-fg md:border-(--red-7) md:bg-danger-soft/50",
           className,
         )}
         {...props}
@@ -655,7 +756,9 @@ function BulkBar({
   scoped,
   onApply,
   onClose,
+  tone = "inline",
 }: {
+  tone?: "inline" | "toast";
   kind: "same" | "split";
   count: number;
   /** True when applying to the selected rows only. */
@@ -669,9 +772,71 @@ function BulkBar({
     const p = parseAmount(value);
     if (!p.ok || !count) return null;
     if (kind === "same") return `${count} × ${formatAmount(p.value)} = ${formatAmount(BigInt(p.value) * BigInt(count))} ${USDC.symbol}`;
-    return `≈ ${formatAmount(BigInt(p.value) / BigInt(count))} ${USDC.symbol} each`;
+    const { each, leftover } = splitEvenly(BigInt(p.value), count);
+    const rest = leftover > BigInt(0) ? ` · ${formatAmount(leftover)} not sent (rounding)` : "";
+    return `${formatAmount(each)} ${USDC.symbol} each${rest}`;
   })();
   const who = scoped ? `${count} selected` : "everyone";
+
+  const hint = error ?? preview ?? (kind === "split" ? "Divided evenly" : "Replaces their amounts");
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(onApply(value));
+  };
+  const input = (cls: string, unit: string) => (
+    <div className="relative">
+      <input
+        autoFocus
+        inputMode="decimal"
+        value={value}
+        onChange={(e) => {
+          setValue(e.target.value.replace(/[^\d.,]/g, ""));
+          setError(null);
+        }}
+        placeholder="0.00"
+        aria-invalid={!!error || undefined}
+        aria-label={kind === "same" ? "Amount each" : "Total to split"}
+        className={cn(
+          "h-9 w-36 border pr-14 pl-4 font-mono text-sm tabular outline-none transition-[border-color,box-shadow,background-color] duration-150",
+          cls,
+        )}
+      />
+      <span className={cn("pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-xs", unit)}>{USDC.symbol}</span>
+    </div>
+  );
+
+  // Inside the selection toast: white on the toast's dark grey, the hint on its own line so the row fits.
+  if (tone === "toast") {
+    return (
+      <form onSubmit={submit} className="flex flex-col gap-1.5 py-0.5">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="pressable -ml-2 grid size-9 place-items-center rounded-[10px] text-white/80 hover:bg-white/15 hover:text-white"
+            aria-label="Back"
+          >
+            {/* Back to the selection summary, not a dismiss: a chevron, not a cross. */}
+            <ChevronLeftIcon className="size-4" />
+          </button>
+          <span className="text-[15px] font-medium whitespace-nowrap">
+            {kind === "same" ? `Amount for ${pluralize(count, "person", "people")}` : `Split between ${pluralize(count, "person", "people")}`}
+          </span>
+          {input(
+            "rounded-[10px] border-white/15 bg-white/10 text-white placeholder:text-white/50 hover:border-white/22 hover:bg-white/[0.12] focus:border-white/45 focus:bg-white/15 aria-invalid:border-[oklch(0.85_0.09_25)]",
+            "text-white/70",
+          )}
+          <button
+            type="submit"
+            className="pressable ml-auto h-9 shrink-0 rounded-[10px] bg-white px-3.5 text-[14px] font-semibold whitespace-nowrap text-fg hover:bg-(--color-200)"
+          >
+            Apply
+          </button>
+        </div>
+        <p className={cn("pl-9 text-[12px]", error ? "font-medium text-[oklch(0.92_0.06_25)]" : "text-white/75")}>{hint}</p>
+      </form>
+    );
+  }
 
   return (
     <motion.form
@@ -679,46 +844,43 @@ function BulkBar({
       animate={{ opacity: 1, height: "auto" }}
       exit={{ opacity: 0, height: 0, transition: { duration: 0.12 } }}
       className="overflow-hidden"
-      onSubmit={(e) => {
-        e.preventDefault();
-        setError(onApply(value));
-      }}
+      onSubmit={submit}
     >
+      {/* Close leads, so the row reads dismiss → task → apply, and Apply ends it. */}
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl bg-surface-muted p-3">
-        <span className="pl-1 text-sm font-medium">
+        <button
+          type="button"
+          onClick={onClose}
+          className="pressable -mr-1 grid size-8 place-items-center rounded-full text-fg-subtle hover:bg-surface hover:text-fg"
+          aria-label="Close"
+        >
+          <CloseIcon className="size-4" />
+        </button>
+        <span className="text-sm font-medium">
           {kind === "same" ? `Pay ${who}` : `Split between ${who}`}
         </span>
-        <div className="relative">
-          <input
-            autoFocus
-            inputMode="decimal"
-            value={value}
-            onChange={(e) => {
-              setValue(e.target.value.replace(/[^\d.,]/g, ""));
-              setError(null);
-            }}
-            placeholder="0.00"
-            aria-invalid={!!error || undefined}
-            className="h-9 w-36 rounded-full border border-border bg-surface pr-14 pl-4 font-mono text-sm tabular outline-none focus:border-primary aria-invalid:border-danger"
-          />
-          <span className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-xs text-fg-subtle">
-            {USDC.symbol}
-          </span>
-        </div>
-        <span className={cn("text-[13px]", error ? "text-danger-fg" : "text-fg-muted")}>
-          {error ?? preview ?? (kind === "split" ? "Divided evenly" : "Replaces their amounts")}
-        </span>
-        <div className="ml-auto flex items-center gap-1">
-          <Button type="submit" size="sm" variant="inverse">
-            Apply to {pluralize(count, "person", "people")}
-          </Button>
-          <button type="button" onClick={onClose} className="pressable grid size-8 place-items-center rounded-full text-fg-subtle hover:bg-surface hover:text-fg" aria-label="Close">
-            <X className="size-4" />
-          </button>
-        </div>
+        {/* Rest, hover, focus, error: each a visible step on the grey bar. */}
+        {input(
+          "rounded-full border-border bg-surface hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_18%,transparent)] aria-invalid:border-danger aria-invalid:focus:shadow-[0_0_0_3px_color-mix(in_oklch,var(--danger)_18%,transparent)]",
+          "text-fg-subtle",
+        )}
+        <span className={cn("text-[13px]", error ? "text-danger-fg" : "text-fg-muted")}>{hint}</span>
+        <Button type="submit" size="sm" variant="inverse" className="ml-auto">
+          Apply to {pluralize(count, "person", "people")}
+        </Button>
       </div>
     </motion.form>
   );
+}
+
+// One cent in base units. Splits round down to it so nobody gets a fraction of a cent.
+const CENT = BigInt(10) ** BigInt(USDC.decimals - 2);
+
+/** Even split rounded down to the cent; `leftover` is what stays unassigned. */
+function splitEvenly(total: bigint, count: number) {
+  const n = BigInt(count);
+  const each = (total / n / CENT) * CENT;
+  return { each, leftover: total - each * n };
 }
 
 /** Summary pill for the list/pay pages: "3 need fixing". */

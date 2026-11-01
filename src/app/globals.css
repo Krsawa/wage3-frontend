@@ -1,56 +1,149 @@
 @import "tailwindcss";
 
 /*
+ * Monument Grotesk (headlines). Commercial font: the files live in public/fonts and are
+ * gitignored until there's a web licence. If they're missing, headlines fall back to Inter.
+ */
+@font-face { font-family: "Monument Grotesk"; src: url("/fonts/MonumentGrotesk-Regular.otf") format("opentype"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Monument Grotesk"; src: url("/fonts/MonumentGrotesk-Medium.otf") format("opentype"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Monument Grotesk"; src: url("/fonts/MonumentGrotesk-Bold.otf") format("opentype"); font-weight: 700; font-style: normal; font-display: swap; }
+
+/*
  * Base brand tokens (brand.base.org). Grayscale and white space lead;
  * Base Blue is reserved for the single most important element on screen.
  * Secondary colors only for status, never as heroes. No gradients.
  */
 :root {
-  --base-blue: #0000ff;
-  --gray-0: #ffffff;
-  --gray-10: #eef0f3;
-  --gray-15: #dee1e7;
-  --gray-30: #b1b7c3;
-  --gray-50: #717886;
-  --gray-60: #5b616e;
-  --gray-80: #32353d;
-  --gray-100: #0a0b0d;
+  --base-blue: oklch(0.452 0.313 264.1);
+  --gray-0: oklch(1 0 0);
+  --gray-10: oklch(0.954 0.005 258.3);
+  --gray-15: oklch(0.909 0.009 264.5);
+  --gray-30: oklch(0.778 0.018 264.5);
+  --gray-50: oklch(0.572 0.023 264.4);
+  --gray-60: oklch(0.492 0.022 265.8);
+  --gray-80: oklch(0.329 0.015 269.2);
+  --gray-100: oklch(0.178 0 0);
+
+  /* Neutral gray scale (the app's grays). 50–500 are near-white fills, 600–950 step down
+     for lines and quiet text. Nothing here is dark enough for body text, so --fg and
+     --fg-muted stay on the darker grays above. */
+  /* Lightest grey, above the scale (frame, sidebar, step cards). */
+  --color-25: oklch(0.985 0 0);
+  --color-50: oklch(0.95 0 0);
+  --color-100: oklch(0.954 0 0);
+  --color-200: oklch(0.958 0 0);
+  --color-300: oklch(0.962 0 0);
+  --color-400: oklch(0.966 0 0);
+  --color-500: oklch(0.97 0 0);
+  --color-600: oklch(0.89 0 0);
+  --color-700: oklch(0.81 0 0);
+  --color-800: oklch(0.73 0 0);
+  --color-900: oklch(0.65 0 0);
+  --color-950: oklch(0.57 0 0);
 
   --bg: var(--gray-0);
   --surface: var(--gray-0);
-  --surface-muted: var(--gray-10);
-  --surface-sunken: #f7f8fa;
-  --border: var(--gray-15);
-  --border-strong: var(--gray-30);
+  --surface-muted: var(--color-400);
+  /* The one neutral hover fill (rows, menu items, nav links, outline/ghost buttons). Lighter than
+     --color-500 but kept below --color-25 (the sidebar), so sidebar hovers still show. */
+  --surface-hover: oklch(0.978 0 0);
+  --surface-sunken: var(--color-25);
+  --border: var(--color-600);
+  /* Softer edge for controls (inputs, outline buttons, date fields); cards and dividers keep --border. */
+  --border-subtle: var(--color-50);
+  --border-strong: var(--color-700);
   --fg: var(--gray-100);
   --fg-muted: var(--gray-60);
-  --fg-subtle: var(--gray-50);
+  --fg-subtle: var(--color-950);
   --primary: var(--base-blue);
-  --primary-hover: #0000d6;
-  --primary-fg: #ffffff;
-  --primary-soft: #ebebff;
+  --primary-hover: oklch(0.396 0.274 264.1);
+  --primary-fg: oklch(1 0 0);
+  --primary-soft: oklch(0.946 0.027 285.9);
   --inverse: var(--gray-100);
-  --inverse-fg: #ffffff;
+  --inverse-fg: oklch(1 0 0);
 
   /* Product status colors: brand hues, darkened where text needs AA. */
-  --success: #66c800;
-  --success-fg: #2e6b00;
-  --success-soft: #eefadf;
-  --danger: #fc401f;
-  --danger-fg: #c42a0e;
-  --danger-soft: #fff0ec;
-  --warning: #ffd12f;
-  --warning-fg: #7a5c00;
-  --warning-soft: #fff8dc;
-  --info: #3c8aff;
-  --info-fg: #1f5fcc;
-  --info-soft: #eaf2ff;
+  /* Text 11 on fill 3 is 5.88:1; icons in 9 on white are 3.35:1. */
+  --success: var(--green-9);
+  --success-fg: var(--green-11);
+  --success-soft: var(--green-3);
+  /* Red scale (hue 17), Radix-style steps: 1–2 backgrounds, 3–5 fills, 6–8 borders, 9–10 solids,
+     11–12 text. Named --red-* so it can't be confused with the grey --color-50…950. */
+  --red-1: oklch(0.99 0.007 17);
+  --red-2: oklch(0.982 0.013 17);
+  --red-3: oklch(0.965 0.036 17);
+  --red-4: oklch(0.946 0.051 17);
+  --red-5: oklch(0.924 0.067 17);
+  --red-6: oklch(0.895 0.083 17);
+  --red-7: oklch(0.856 0.101 17);
+  --red-8: oklch(0.802 0.124 17);
+  --red-9: oklch(0.647 0.176 17);
+  --red-10: oklch(0.61 0.186 17);
+  --red-11: oklch(0.49 0.155 17);
+  --red-12: oklch(0.367 0.102 17);
+
+  /* Blue scale (hue 252): selection, checkboxes, the selection toast. */
+  --blue-1: oklch(0.989 0.008 252);
+  --blue-2: oklch(0.978 0.014 252);
+  --blue-3: oklch(0.958 0.035 252);
+  --blue-4: oklch(0.936 0.053 252);
+  --blue-5: oklch(0.912 0.071 252);
+  --blue-6: oklch(0.88 0.09 252);
+  --blue-7: oklch(0.836 0.112 252);
+  --blue-8: oklch(0.772 0.142 252);
+  --blue-9: oklch(0.629 0.187 252);
+  --blue-10: oklch(0.587 0.193 252);
+  --blue-11: oklch(0.471 0.155 252);
+  --blue-12: oklch(0.353 0.103 252);
+
+  /* Amber scale (hue 91): warnings. */
+  --amber-1: oklch(0.991 0.01 91);
+  --amber-2: oklch(0.985 0.021 91);
+  --amber-3: oklch(0.972 0.049 91);
+  --amber-4: oklch(0.96 0.074 91);
+  --amber-5: oklch(0.943 0.098 91);
+  --amber-6: oklch(0.92 0.122 91);
+  --amber-7: oklch(0.886 0.147 91);
+  --amber-8: oklch(0.835 0.176 91);
+  --amber-9: oklch(0.725 0.187 91);
+  --amber-10: oklch(0.667 0.177 91);
+  --amber-11: oklch(0.527 0.136 91);
+  --amber-12: oklch(0.385 0.088 91);
+
+  /* Green scale (hue 145): success states. */
+  --green-1: oklch(0.989 0.01 145);
+  --green-2: oklch(0.978 0.018 145);
+  --green-3: oklch(0.956 0.042 145);
+  --green-4: oklch(0.931 0.062 145);
+  --green-5: oklch(0.902 0.082 145);
+  --green-6: oklch(0.868 0.102 145);
+  --green-7: oklch(0.823 0.125 145);
+  --green-8: oklch(0.762 0.153 145);
+  --green-9: oklch(0.623 0.178 145);
+  --green-10: oklch(0.579 0.179 145);
+  --green-11: oklch(0.464 0.143 145);
+  --green-12: oklch(0.348 0.095 145);
+
+  --danger: var(--red-9);
+  --danger-fg: var(--red-11);
+  --danger-soft: var(--red-3);
+  /* Text 11 on fill 3 is 4.90:1; #111 on 9 (status banner) is 7.77:1. */
+  --warning: var(--amber-9);
+  --warning-fg: var(--amber-11);
+  --warning-soft: var(--amber-3);
+  --info: oklch(0.646 0.19 258.7);
+  --info-fg: oklch(0.512 0.181 260.5);
+  --info-soft: oklch(0.959 0.019 260.2);
 
   --ring: var(--base-blue);
-  --shadow-sm: 0 1px 2px rgb(10 11 13 / 0.04), 0 1px 1px rgb(10 11 13 / 0.03);
-  --shadow-md: 0 4px 16px -4px rgb(10 11 13 / 0.08), 0 2px 4px rgb(10 11 13 / 0.04);
-  --shadow-lg: 0 24px 48px -12px rgb(10 11 13 / 0.18), 0 4px 12px rgb(10 11 13 / 0.06);
-  --overlay: rgb(10 11 13 / 0.4);
+  /* Layered: a hairline contact edge plus a barely-there lift (interfaces.dev cheat sheet). */
+  --shadow-xs: 0 0 0 0.5px oklch(0.178 0 0 / 0.06), 0 1px 1px -0.5px oklch(0.178 0 0 / 0.04), 0 2px 4px -2px oklch(0.178 0 0 / 0.04);
+  /* Menus: hairline edge + soft lift, no border (cheat sheet: layered shadows over borders). */
+  --shadow-menu: 0 0 0 0.5px oklch(0.178 0 0 / 0.08), 0 2px 6px oklch(0.178 0 0 / 0.05), 0 12px 32px -8px oklch(0.178 0 0 / 0.16);
+  --shadow-sm: 0 1px 2px oklch(0.178 0 0 / 0.04), 0 1px 1px oklch(0.178 0 0 / 0.03);
+  --shadow-md: 0 4px 16px -4px oklch(0.178 0 0 / 0.08), 0 2px 4px oklch(0.178 0 0 / 0.04);
+  --shadow-lg: 0 24px 48px -12px oklch(0.178 0 0 / 0.18), 0 4px 12px oklch(0.178 0 0 / 0.06);
+  --overlay: oklch(0.178 0 0 / 0.4);
 
   /* Motion (emil-design-eng). Never ease-in on UI. */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -58,35 +151,36 @@
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+/* Light mode only for now. Dark tokens kept behind a class nothing sets yet. */
+.dark {
+  & {
     --bg: var(--gray-100);
-    --surface: #141519;
-    --surface-muted: #1e2025;
-    --surface-sunken: #0f1013;
-    --border: #2a2c32;
-    --border-strong: #3d4048;
-    --fg: #ffffff;
+    --surface: oklch(0.196 0.008 274.5);
+    --surface-muted: oklch(0.244 0.01 268.3);
+    --surface-sunken: oklch(0.173 0.006 271);
+    --border: oklch(0.294 0.011 271);
+    --border-strong: oklch(0.372 0.014 269.3);
+    --fg: oklch(1 0 0);
     --fg-muted: var(--gray-30);
-    --fg-subtle: #8a909c;
-    --primary: #3c3cff;
-    --primary-hover: #5252ff;
-    --primary-soft: #16163d;
-    --inverse: #ffffff;
+    --fg-subtle: oklch(0.652 0.019 264.4);
+    --primary: oklch(0.512 0.274 271.3);
+    --primary-hover: oklch(0.554 0.248 274.7);
+    --primary-soft: oklch(0.227 0.073 278.9);
+    --inverse: oklch(1 0 0);
     --inverse-fg: var(--gray-100);
-    --success-fg: #8ee03a;
-    --success-soft: #16240a;
-    --danger-fg: #ff7a61;
-    --danger-soft: #2d130e;
-    --warning-fg: #ffd12f;
-    --warning-soft: #2b2408;
-    --info-fg: #7fb2ff;
-    --info-soft: #0f1e36;
-    --ring: #5252ff;
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow-md: 0 4px 16px -4px rgb(0 0 0 / 0.5);
-    --shadow-lg: 0 24px 48px -12px rgb(0 0 0 / 0.7);
-    --overlay: rgb(0 0 0 / 0.6);
+    --success-fg: oklch(0.824 0.208 132.7);
+    --success-soft: oklch(0.24 0.049 132.6);
+    --danger-fg: oklch(0.73 0.167 32.2);
+    --danger-soft: oklch(0.224 0.044 32.1);
+    --warning-fg: oklch(0.876 0.169 91.4);
+    --warning-soft: oklch(0.261 0.044 95.1);
+    --info-fg: oklch(0.759 0.124 258.4);
+    --info-soft: oklch(0.236 0.051 259.4);
+    --ring: oklch(0.554 0.248 274.7);
+    --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
+    --shadow-md: 0 4px 16px -4px oklch(0 0 0 / 0.5);
+    --shadow-lg: 0 24px 48px -12px oklch(0 0 0 / 0.7);
+    --overlay: oklch(0 0 0 / 0.6);
   }
 }
 
@@ -94,6 +188,8 @@
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
+  --color-surface-hover: var(--surface-hover);
+  --color-border-subtle: var(--border-subtle);
   --color-surface-sunken: var(--surface-sunken);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
@@ -121,9 +217,10 @@
   --color-info-soft: var(--info-soft);
   --color-ring: var(--ring);
 
-  --font-sans: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Monument Grotesk", var(--font-inter), ui-sans-serif, sans-serif;
   --font-mono: var(--font-roboto-mono), ui-monospace, monospace;
-  --font-display: var(--font-doto), var(--font-inter-tight), sans-serif;
+  --font-display: var(--font-doto), var(--font-inter), sans-serif;
 
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
@@ -135,6 +232,38 @@
 
   --animate-shimmer: shimmer 1.4s linear infinite;
   --animate-spin-fast: spin 0.6s linear infinite;
+  /*
+   * Popover motion, one source of truth (interfaces cheat sheet):
+   * - scale from the trigger (each component sets transform-origin from Radix's variable)
+   * - exits subtler and quicker than entrances (0.98 vs 0.96, 120ms vs 160ms; tooltips fade only)
+   * - submenus open on hover over and over, so they enter quicker (120ms)
+   * - every curve is --ease-out; reduced motion is handled globally below
+   * Keyframes must live in @theme or Tailwind can drop them, and Radix then never gets
+   * animationend and leaves a closed popover on screen.
+   */
+  --animate-menu-in: menu-in 160ms var(--ease-out);
+  --animate-menu-out: menu-out 120ms var(--ease-out) forwards;
+  --animate-submenu-in: menu-in 120ms var(--ease-out);
+  --animate-tip-in: menu-in 150ms var(--ease-out);
+  --animate-tip-out: tip-out 100ms var(--ease-out) forwards;
+
+  @keyframes menu-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
+  @keyframes menu-out {
+    to {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+  }
+  @keyframes tip-out {
+    to {
+      opacity: 0;
+    }
+  }
 
   @keyframes shimmer {
     from {
@@ -148,7 +277,7 @@
 
 @layer base {
   html {
-    color-scheme: light dark;
+    color-scheme: light;
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -164,7 +293,7 @@
 
   ::selection {
     background: var(--base-blue);
-    color: #fff;
+    color: oklch(1 0 0);
   }
 
   :focus-visible {
@@ -179,12 +308,31 @@
   }
 }
 
+/*
+ * iOS-style continuous corners everywhere. superellipse(1.5) is close to Figma's
+ * "iOS smoothing" (60%): the curve eases into the straight edge instead of meeting it.
+ * Pills and circles keep true round ends, like iOS capsules. Browsers without
+ * corner-shape (Safari, Firefox today) just keep ordinary round corners.
+ */
+@layer base {
+  @supports (corner-shape: superellipse(1.5)) {
+    * {
+      corner-shape: superellipse(1.5);
+    }
+    .rounded-full,
+    [class*="rounded-full"] {
+      corner-shape: round;
+    }
+  }
+}
+
 @utility tabular {
   font-variant-numeric: tabular-nums;
 }
 
-/* Headline: Medium, -3% tracking, 100% leading (brand typography spec). */
+/* Headline: Monument Grotesk Medium, -3% tracking, 100% leading (brand typography spec). */
 @utility headline {
+  @apply font-heading;
   font-weight: 500;
   letter-spacing: -0.03em;
   line-height: 1;
@@ -210,15 +358,3 @@
   }
 }
 
-@keyframes menu-in {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-}
-@keyframes menu-out {
-  to {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-}

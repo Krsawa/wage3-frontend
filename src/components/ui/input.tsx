@@ -1,13 +1,14 @@
 import { forwardRef, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 
+import { ResizeIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
 const base =
-  "w-full rounded-xl border border-border bg-surface px-3.5 text-[15px] text-fg placeholder:text-fg-subtle " +
+  "w-full rounded-xl border border-border-subtle bg-surface px-3.5 text-[15px] text-fg placeholder:text-fg-subtle " +
   "transition-[border-color,box-shadow] duration-150 outline-none " +
-  "hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)] " +
+  "hover:border-border focus:border-primary focus:shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_18%,transparent)] " +
   "disabled:cursor-not-allowed disabled:opacity-50 " +
-  "aria-invalid:border-danger aria-invalid:focus:shadow-[0_0_0_3px_var(--danger-soft)]";
+  "aria-invalid:border-danger aria-invalid:focus:shadow-[0_0_0_3px_color-mix(in_oklch,var(--danger)_18%,transparent)]";
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   leading?: ReactNode;
@@ -41,12 +42,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement> & { invalid?: boolean }>(
   function Textarea({ className, invalid, ...props }, ref) {
     return (
-      <textarea
-        ref={ref}
-        aria-invalid={invalid || undefined}
-        className={cn(base, "min-h-28 py-3 leading-relaxed", className)}
-        {...props}
-      />
+      <div className="relative">
+        <textarea
+          ref={ref}
+          aria-invalid={invalid || undefined}
+          className={cn(base, "block min-h-28 resize-y py-3 leading-relaxed [&::-webkit-resizer]:bg-transparent", className)}
+          {...props}
+        />
+        <ResizeIcon className="pointer-events-none absolute right-1.5 bottom-1.5 size-3 text-fg-subtle" />
+      </div>
     );
   },
 );

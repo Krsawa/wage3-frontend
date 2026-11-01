@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronLeft, ChevronRight, ChevronDown, Plus, Search, Send, X } from "lucide-react";
+
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -9,23 +9,39 @@ import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "
 import { Address } from "@/components/ui/address";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Calendar, CalendarFooter, formatYmd, type YmdRange } from "@/components/ui/date-picker";
+import {
+  DropdownContent,
+  DropdownLabel,
+  DropdownMenu,
+  DropdownRadioGroup,
+  DropdownRadioItem,
+  DropdownSeparator,
+  DropdownSub,
+  DropdownSubContent,
+  DropdownSubTrigger,
+  DropdownTrigger,
+} from "@/components/ui/dropdown";
+import { ChevronLeftIcon, ChevronRightIcon, FiltersIcon, PlusIcon, SearchIcon } from "@/components/ui/icons";
+import { Tooltip } from "@/components/ui/tooltip";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState, ErrorState } from "@/components/ui/states";
+import { EmptyState, ErrorState, IllustratedEmpty } from "@/components/ui/states";
 import { PayoutStatusBadge } from "@/components/ui/status-badge";
 import { useLists, useSentHistory } from "@/lib/api/queries";
 import type { SentHistoryQuery, SentPayout, SentStatus } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
-import { formatDateTime, formatToken, pluralize } from "@/lib/format";
+import { formatDateTime, formatToken, pluralize, toApiDate } from "@/lib/format";
+import { SLIDE } from "@/lib/motion";
+import { DISPLAY_TEXT } from "@/lib/type";
 
 const PAGE_SIZE = 20;
 
 const STATUSES: { value: "" | SentStatus; label: string }[] = [
-  { value: "", label: "All statuses" },
-  { value: "submitted", label: "Sending" },
-  { value: "paid", label: "Paid" },
-  { value: "partially_paid", label: "Partially paid" },
+  { value: "", label: "All" },
+  { value: "submitted", label: "In progress" },
+  { value: "paid", label: "Done" },
+  { value: "partially_paid", label: "Needs attention" },
 ];
 
 const isStatus = (s: string | null): s is SentStatus =>
@@ -38,9 +54,9 @@ export default function HistoryPage() {
         title="History"
         description="Every payment you've sent from Wage3, confirmed on Base."
         actions={
-          <Button asChild>
+          <Button asChild variant="inverse">
             <Link href="/pay/new">
-              <Plus className="size-4" /> New payment
+              <PlusIcon className="size-4" /> New payment
             </Link>
           </Button>
         }
@@ -77,7 +93,8 @@ function HistoryContent() {
     if (opts.resetPage !== false && !("page" in patch)) next.delete("page");
     const qs = next.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    if (opts.scroll) window.scrollTo({ top: 0, behavior: "smooth" });
+    // The page scrolls inside the app panel, not the window (see (app)/layout.tsx).
+    if (opts.scroll) document.getElementById("app-scroll")?.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // Search box: local state, pushed to the URL after typing pauses.
@@ -139,77 +156,36 @@ function HistoryContent() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Filters */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="lg:w-72">
-          <Input
-            type="search"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by name"
-            aria-label="Search payments by name"
-            leading={<Search className="size-4" />}
-            className="h-10"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select
-            aria-label="Status"
-            value={status ?? ""}
-            onChange={(v) => setParams({ status: v || undefined })}
-          >
-            {STATUSES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </Select>
-          <Select
-            aria-label="List"
-            value={listId}
-            onChange={(v) => setParams({ list: v || undefined })}
-            disabled={lists.isLoading}
-          >
-            <option value="">All lists</option>
-            {lists.data?.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-            {listId && lists.data && !lists.data.some((l) => l.id === listId) && (
-              <option value={listId}>Deleted list</option>
-            )}
-          </Select>
-          <div className="flex items-center gap-1.5">
-            <DateInput
-              aria-label="From date"
-              value={from}
-              max={to || undefined}
-              invalid={!!dateError}
-              onChange={(v) => setParams({ from: v || undefined })}
-            />
-            <span className="text-[13px] text-fg-subtle">to</span>
-            <DateInput
-              aria-label="To date"
-              value={to}
-              min={from || undefined}
-              invalid={!!dateError}
-              onChange={(v) => setParams({ to: v || undefined })}
+      {/* Tabs on the left, filters at the end, on one line. The filter group repeats the tabs'
+          12px bottom padding so both centre on the same line. */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <StatusTabs value={status} onChange={(v) => setParams({ status: v })} />
+
+        {/* Filters */}
+        <div className="flex items-center gap-2 md:pb-3">
+          {/* The top bar's search, as designed: grey pill, no border, blue ring on focus. */}
+          <div className="relative min-w-0 flex-1 md:w-64 md:flex-none">
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-fg-subtle" />
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search payments"
+              aria-label="Search payments by name"
+              className="h-10 w-full rounded-full bg-surface-muted pr-4 pl-10 text-sm outline-none transition-[background-color,box-shadow] duration-150 placeholder:text-fg-subtle focus:bg-surface focus:shadow-[0_0_0_2px_var(--primary)]"
             />
           </div>
-          <AnimatePresence initial={false}>
-            {hasFilters && (
-              <motion.div
-                initial={{ opacity: 0, transform: "scale(0.96)" }}
-                animate={{ opacity: 1, transform: "scale(1)" }}
-                exit={{ opacity: 0, transform: "scale(0.96)", transition: { duration: 0.12 } }}
-              >
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  <X className="size-3.5" /> Clear filters
-                </Button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="flex flex-wrap items-center gap-2">
+            <FiltersMenu
+              lists={lists.data ?? []}
+              listId={listId}
+              from={from}
+              to={to}
+              onList={(id) => setParams({ list: id || undefined })}
+              onTime={(range) => setParams({ from: range.from || undefined, to: range.to || undefined })}
+              onReset={() => setParams({ list: undefined, from: undefined, to: undefined })}
+            />
+          </div>
         </div>
       </div>
 
@@ -230,7 +206,7 @@ function HistoryContent() {
         <Card>
           {hasFilters ? (
             <EmptyState
-              icon={<Search />}
+              icon={<SearchIcon />}
               title="Nothing matches these filters"
               description="Try a different name, status or date range."
               action={
@@ -240,18 +216,7 @@ function HistoryContent() {
               }
             />
           ) : (
-            <EmptyState
-              icon={<Send />}
-              title="No payments yet"
-              description="When you send USDC from Wage3, every payment shows up here with its on-chain receipt."
-              action={
-                <Button asChild>
-                  <Link href="/pay/new">
-                    <Plus className="size-4" /> New payment
-                  </Link>
-                </Button>
-              }
-            />
+            <FirstPaymentEmpty />
           )}
         </Card>
       ) : (
@@ -282,6 +247,216 @@ function HistoryContent() {
   );
 }
 
+// ---- Filters menu ----
+
+const TIME_PRESETS = [
+  { id: "7", label: "Last 7 days", days: 7 },
+  { id: "30", label: "Last 30 days", days: 30 },
+  { id: "90", label: "Last 90 days", days: 90 },
+] as const;
+
+/** UTC day `n` days back, matching the backend's day boundaries. */
+const daysAgo = (n: number) => toApiDate(new Date(Date.now() - n * 86_400_000));
+
+/** Which preset a from/to pair is, if any ("Last 30 days" = from 29 days ago, no end). */
+function presetFor(from: string, to: string) {
+  if (!from || to) return null;
+  return TIME_PRESETS.find((p) => from === daysAgo(p.days - 1)) ?? null;
+}
+
+/**
+ * Filters collapsed behind one button. List and Time each open a secondary menu; a count on
+ * the button says how many are active. Reset clears both (search has its own clear).
+ */
+function FiltersMenu({
+  lists,
+  listId,
+  from,
+  to,
+  onList,
+  onTime,
+  onReset,
+}: {
+  lists: { id: string; name: string }[];
+  listId: string;
+  from: string;
+  to: string;
+  onList: (id: string) => void;
+  onTime: (range: YmdRange) => void;
+  onReset: () => void;
+}) {
+  const preset = presetFor(from, to);
+  const time = (from || to) && !preset ? "custom" : (preset?.id ?? "all");
+  const active = (listId ? 1 : 0) + (from || to ? 1 : 0);
+  // Short (no year) so it fits the menu's hint column.
+  const short = (v: string) => formatYmd(v).replace(/ \d{4}$/, "");
+  const rangeName = from || to ? `${from ? short(from) : "…"} – ${to ? short(to) : "…"}` : "";
+  const listName = listId ? (lists.find((l) => l.id === listId)?.name ?? "Deleted list") : "All lists";
+  const timeName = time === "custom" ? rangeName : (preset?.label ?? "All time");
+
+  return (
+    <DropdownMenu>
+      <Tooltip content="Filters">
+        <DropdownTrigger asChild>
+          {/* The count sits inside the button beside the icon, not hanging off its corner. */}
+          <Button
+            variant="outline"
+            aria-label={active ? `Filters, ${active} active` : "Filters"}
+            className={cn(
+              "h-10 shrink-0 gap-1.5 rounded-full",
+              active > 0 ? "px-3" : "w-10 p-0",
+            )}
+          >
+            <FiltersIcon className="size-4" />
+            {active > 0 && (
+              <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-inverse px-1 text-[11px] font-medium text-inverse-fg tabular">
+                {active}
+              </span>
+            )}
+          </Button>
+        </DropdownTrigger>
+      </Tooltip>
+      <DropdownContent className="w-64">
+        <DropdownLabel
+          action={
+            active > 0 && (
+              <button type="button" onClick={onReset}>
+                Reset
+              </button>
+            )
+          }
+        >
+          Filters
+        </DropdownLabel>
+
+        <DropdownSub>
+          <DropdownSubTrigger hint={listName}>List</DropdownSubTrigger>
+          <DropdownSubContent className="max-h-80 w-56 overflow-y-auto">
+            <DropdownRadioGroup value={listId} onValueChange={onList}>
+              <DropdownRadioItem value="">All lists</DropdownRadioItem>
+              {lists.map((l) => (
+                <DropdownRadioItem key={l.id} value={l.id}>
+                  {l.name}
+                </DropdownRadioItem>
+              ))}
+              {listId && !lists.some((l) => l.id === listId) && (
+                <DropdownRadioItem value={listId}>Deleted list</DropdownRadioItem>
+              )}
+            </DropdownRadioGroup>
+          </DropdownSubContent>
+        </DropdownSub>
+
+        <DropdownSub>
+          <DropdownSubTrigger hint={timeName}>Time</DropdownSubTrigger>
+          <DropdownSubContent className="w-56">
+            <DropdownRadioGroup
+              value={time}
+              onValueChange={(v) =>
+                onTime(
+                  v === "all"
+                    ? { from: "", to: "" }
+                    : { from: daysAgo(TIME_PRESETS.find((p) => p.id === v)!.days - 1), to: "" },
+                )
+              }
+            >
+              <DropdownRadioItem value="all">All time</DropdownRadioItem>
+              {TIME_PRESETS.map((p) => (
+                <DropdownRadioItem key={p.id} value={p.id}>
+                  {p.label}
+                </DropdownRadioItem>
+              ))}
+            </DropdownRadioGroup>
+            <DropdownSeparator />
+            {/* Custom range: the calendar opens right here, a third level in. */}
+            <DropdownSub>
+              <DropdownSubTrigger>Custom range</DropdownSubTrigger>
+              <DropdownSubContent className="w-[266px]">
+                <Calendar
+                  mode="range"
+                  value={time === "custom" ? { from, to } : { from: "", to: "" }}
+                  onSelect={onTime}
+                />
+                <CalendarFooter>
+                  <span className="text-fg-subtle">{to ? "Range set" : from ? "Now pick an end date" : "Pick a start date"}</span>
+                  <button
+                    type="button"
+                    disabled={!from && !to}
+                    onClick={() => onTime({ from: "", to: "" })}
+                    className="text-fg-subtle hover:text-fg disabled:opacity-35"
+                  >
+                    Clear
+                  </button>
+                </CalendarFooter>
+              </DropdownSubContent>
+            </DropdownSub>
+          </DropdownSubContent>
+        </DropdownSub>
+      </DropdownContent>
+    </DropdownMenu>
+  );
+}
+
+// ---- Status tabs ----
+
+/** Underlined tabs; the underline slides to the active status. */
+function StatusTabs({ value, onChange }: { value: SentStatus | undefined; onChange: (v: SentStatus | undefined) => void }) {
+  return (
+    <div role="tablist" aria-label="Status" className="flex w-fit max-w-full gap-6 self-start overflow-x-auto">
+      {STATUSES.map((t) => {
+        const on = (value ?? "") === t.value;
+        return (
+          <button
+            key={t.value || "all"}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(t.value || undefined)}
+            className={cn(
+              // Inter Display at one weight for every tab, so the sliding underline never jumps.
+              DISPLAY_TEXT,
+              "relative pb-3 text-[15px] font-medium whitespace-nowrap transition-colors duration-150",
+              on ? "text-fg" : "text-fg-muted hover:text-fg",
+            )}
+          >
+            {t.label}
+            {on && (
+              <motion.span
+                layoutId="history-tab"
+                className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-fg"
+                transition={SLIDE}
+              />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---- Empty state ----
+
+/** No payments yet. */
+function FirstPaymentEmpty() {
+  return (
+    <IllustratedEmpty
+      title="Send your first payment"
+      description="Pay your whole team in USDC on Base. Every payment lands here with its on-chain receipt."
+      actions={
+        <>
+          <Button asChild variant="inverse">
+            <Link href="/pay/new">
+              <PlusIcon className="size-4" /> New payment
+            </Link>
+          </Button>
+          <Link href="/#how" className="text-sm font-medium text-fg-muted hover:text-fg">
+            How it works
+          </Link>
+        </>
+      }
+    />
+  );
+}
+
 // ---- Table ----
 
 const COLS =
@@ -301,13 +476,13 @@ function HistoryTable({ items }: { items: SentPayout[] }) {
       </div>
       <ul className="divide-y divide-border">
         {items.map((p) => (
-          <li key={p.id} className="relative transition-colors duration-150 hover:bg-surface-sunken">
+          <li key={p.id} className="relative transition-colors duration-150 hover:bg-surface-hover">
             {/* Full-row link sits under the cells so the Address actions stay clickable. */}
             <Link href={`/pay/${p.id}`} className="absolute inset-0" aria-label={`Open ${p.name}`} />
             <div className={cn("pointer-events-none relative grid grid-cols-2 gap-x-4 gap-y-1.5 px-5 py-4 md:items-center md:gap-y-0", COLS)}>
               <span className="col-span-2 truncate text-sm font-medium md:col-span-1">{p.name}</span>
               <span className="order-last md:order-none">
-                <PayoutStatusBadge status={p.status} />
+                <PayoutStatusBadge status={p.status} grouped />
               </span>
               <Cell label="Recipients" className="md:text-right">
                 {(p.recipient_count ?? 0).toLocaleString("en-US")}
@@ -404,10 +579,10 @@ function PaginationBar({
           Page {page} of {totalPages}
         </span>
         <Button variant="outline" size="icon-sm" aria-label="Previous page" disabled={!hasPrev || disabled} onClick={() => onPage(page - 1)}>
-          <ChevronLeft className="size-4" />
+          <ChevronLeftIcon className="size-4" />
         </Button>
         <Button variant="outline" size="icon-sm" aria-label="Next page" disabled={!hasNext || disabled} onClick={() => onPage(page + 1)}>
-          <ChevronRight className="size-4" />
+          <ChevronRightIcon className="size-4" />
         </Button>
       </div>
     </nav>
@@ -416,56 +591,3 @@ function PaginationBar({
 
 // ---- Filter controls ----
 
-function Select({
-  value,
-  onChange,
-  children,
-  className,
-  ...props
-}: Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "onChange"> & { onChange: (v: string) => void }) {
-  return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={cn(
-          "h-10 max-w-52 appearance-none truncate rounded-full border border-border bg-surface pr-9 pl-4 text-sm text-fg outline-none",
-          "transition-[border-color] duration-150 hover:border-border-strong focus:border-primary disabled:opacity-50",
-          value && "border-border-strong font-medium",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-      </select>
-      <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-fg-subtle" />
-    </div>
-  );
-}
-
-function DateInput({
-  value,
-  onChange,
-  invalid,
-  ...props
-}: Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange" | "value"> & {
-  value: string;
-  onChange: (v: string) => void;
-  invalid?: boolean;
-}) {
-  return (
-    <input
-      type="date"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      aria-invalid={invalid || undefined}
-      className={cn(
-        "h-10 rounded-full border border-border bg-surface px-3.5 font-mono text-[13px] text-fg tabular outline-none",
-        "transition-[border-color] duration-150 hover:border-border-strong focus:border-primary",
-        !value && "text-fg-subtle",
-        "aria-invalid:border-danger",
-      )}
-      {...props}
-    />
-  );
-}

@@ -11,17 +11,17 @@ import { Spinner } from "./spinner";
 const variants = {
   // Base Blue: one per screen, the action that matters most.
   primary: "bg-primary text-primary-fg hover:bg-primary-hover",
-  inverse: "bg-inverse text-inverse-fg hover:opacity-90",
+  inverse: "bg-inverse text-inverse-fg hover:bg-[oklch(0.3_0_0)]",
   secondary: "bg-surface-muted text-fg hover:bg-border",
-  outline: "border border-border bg-surface text-fg hover:border-border-strong hover:bg-surface-sunken",
-  ghost: "text-fg-muted hover:text-fg hover:bg-surface-muted",
+  outline: "border border-border-subtle bg-surface text-fg hover:border-border hover:bg-surface-hover",
+  ghost: "text-fg-muted hover:text-fg hover:bg-surface-hover",
   danger: "bg-danger-soft text-danger-fg hover:bg-danger hover:text-white",
 } as const;
 
 const sizes = {
   sm: "h-8 px-3 text-[13px] gap-1.5",
   md: "h-10 px-4 text-sm gap-2",
-  lg: "h-12 px-6 text-[15px] gap-2",
+  lg: "h-12 px-6 text-[15px] font-semibold gap-2",
   icon: "size-9",
   "icon-sm": "size-8",
 } as const;

@@ -66,7 +66,7 @@ export function ErrorState({
       <div
         role="alert"
         className={cn(
-          "flex items-center gap-3 rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger-fg",
+          "flex items-center gap-3 rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger-fg",
           className,
         )}
       >
@@ -99,6 +99,32 @@ export function ErrorState({
           <RotateCw className="size-3.5" /> Try again
         </Button>
       )}
+    </div>
+  );
+}
+
+/**
+ * Empty state for a page's first use: an illustration (a placeholder square until it's drawn),
+ * a heading, one line on why, then the main action and a quiet secondary one. Left-aligned in a
+ * narrow column, as on History and Lists.
+ */
+export function IllustratedEmpty({
+  title,
+  description,
+  actions,
+}: {
+  title: ReactNode;
+  description: ReactNode;
+  actions: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center px-6 py-16">
+      <div className="flex w-full max-w-sm flex-col items-start">
+        <div aria-hidden className="size-40 rounded-2xl bg-surface-muted" />
+        <h2 className="headline mt-8 text-[24px] font-normal">{title}</h2>
+        <p className="mt-2 text-[15px] leading-6 text-fg-muted text-pretty">{description}</p>
+        <div className="mt-6 flex items-center gap-5">{actions}</div>
+      </div>
     </div>
   );
 }

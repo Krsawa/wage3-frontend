@@ -1,11 +1,12 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ChevronRight, Wallet } from "lucide-react";
+
 import { useConnect, useConnectors } from "wagmi";
 
 import { Dialog } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { ChevronRightIcon, WalletIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
 function friendlyConnectError(message: string) {
@@ -32,7 +33,7 @@ export function ConnectDialog({ open, onOpenChange }: { open: boolean; onOpenCha
         onOpenChange(o);
       }}
       title="Connect a wallet"
-      description="Choose the wallet that holds the USDC you're sending. Wage3 never holds your funds."
+      description="Choose the wallet holding the USDC you're sending."
     >
       <ul className="flex flex-col gap-2">
         {list.map((c, i) => {
@@ -49,19 +50,20 @@ export function ConnectDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 type="button"
                 disabled={isPending}
                 onClick={() => connect({ connector: c })}
+                // Layered shadow, not a border; radius nests with the tile (8 + 12px padding = 20).
                 className={cn(
-                  "pressable flex w-full items-center gap-3 rounded-2xl border border-border bg-surface p-3 text-left",
-                  "hover:border-border-strong hover:bg-surface-sunken disabled:opacity-60",
+                  "pressable flex w-full items-center gap-3 rounded-[20px] bg-surface p-3 text-left shadow-(--shadow-xs)",
+                  "hover:bg-surface-hover disabled:opacity-60",
                 )}
               >
-                <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-surface-muted">
+                <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-[8px] bg-surface-muted">
                   {c.icon ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={c.icon} alt="" className="size-10" />
                   ) : isBase ? (
                     <span className="size-5 rounded-[5px] bg-base-blue" />
                   ) : (
-                    <Wallet className="size-5 text-fg-muted" />
+                    <WalletIcon className="size-5 text-fg-muted" />
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -70,7 +72,7 @@ export function ConnectDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                     {isBase ? "Sign in with a passkey. No extension needed." : "Browser wallet"}
                   </span>
                 </span>
-                {pending ? <Spinner className="size-4 text-fg-muted" /> : <ChevronRight className="size-4 text-fg-subtle" />}
+                {pending ? <Spinner className="size-4 text-fg-muted" /> : <ChevronRightIcon className="size-4 text-fg-subtle" />}
               </button>
             </motion.li>
           );

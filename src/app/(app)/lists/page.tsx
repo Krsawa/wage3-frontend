@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ChevronRight, Plus, Search, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -11,10 +10,15 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { EmptyState, ErrorState } from "@/components/ui/states";
+import { Card } from "@/components/ui/card";
+import { EmptyState, ErrorState, IllustratedEmpty } from "@/components/ui/states";
+import { CloseIcon, PeopleIcon, PlusIcon, RepeatIcon, SearchIcon } from "@/components/ui/icons";
+import { LogoPreview } from "@/components/ui/logo-field";
 import { useLists } from "@/lib/api/queries";
 import type { ListSummary } from "@/lib/api/types";
+import { cn } from "@/lib/cn";
 import { formatRelative, pluralize } from "@/lib/format";
+import { useListLogo } from "@/lib/local-prefs";
 
 function useDebounced<T>(value: T, ms = 250) {
   const [v, setV] = useState(value);
@@ -40,7 +44,7 @@ export default function ListsPage() {
         description="Saved groups of people you pay often. Start a payment from a list and every amount is filled in for you."
         actions={
           <Button onClick={createNow} loading={isCreating}>
-            <Plus className="size-4" /> New list
+            <PlusIcon className="size-4" /> New list
           </Button>
         }
       />
@@ -53,7 +57,7 @@ export default function ListsPage() {
             onKeyDown={(e) => e.key === "Escape" && setQuery("")}
             placeholder="Search lists"
             aria-label="Search lists"
-            leading={<Search className="size-4" />}
+            leading={<SearchIcon className="size-4" />}
             trailing={
               searching ? (
                 <Spinner className="mr-1.5 size-4 text-fg-subtle" />
@@ -61,10 +65,10 @@ export default function ListsPage() {
                 <button
                   type="button"
                   onClick={() => setQuery("")}
-                  className="pressable grid size-7 place-items-center rounded-full text-fg-subtle hover:bg-surface-muted hover:text-fg"
+                  className="pressable grid size-7 place-items-center rounded-full text-fg-subtle hover:bg-surface-hover hover:text-fg"
                   aria-label="Clear search"
                 >
-                  <X className="size-3.5" />
+                  <CloseIcon className="size-3.5" />
                 </button>
               ) : null
             }
@@ -73,17 +77,20 @@ export default function ListsPage() {
       ) : null}
 
       {lists.isLoading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-[118px] rounded-2xl" />
+        <Card className="overflow-hidden">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 border-b border-border px-5 py-3.5 last:border-b-0">
+              <Skeleton className="size-9 rounded-full" />
+              <Skeleton className="h-4 w-40" />
+            </div>
           ))}
-        </div>
+        </Card>
       ) : lists.isError ? (
         <ErrorState error={lists.error} onRetry={() => lists.refetch()} retrying={lists.isFetching} />
       ) : !lists.data?.length ? (
         search ? (
           <EmptyState
-            icon={<Search />}
+            icon={<SearchIcon />}
             title={`No lists match “${search}”`}
             description="Try a different name, or clear the search to see every list."
             action={
@@ -93,52 +100,97 @@ export default function ListsPage() {
             }
           />
         ) : (
-          <EmptyState
-            icon={<Users />}
-            title="No lists yet"
-            description="Save your team or contributors once, then pay them all in a couple of clicks every time."
-            action={
-              <Button onClick={createNow} loading={isCreating}>
-                <Plus className="size-4" /> Create your first list
-              </Button>
-            }
-          />
+          <Card>
+            <IllustratedEmpty
+              title="Save your first list"
+              description="Save your team or contributors once, then pay them all in a couple of clicks every time."
+              actions={
+                <>
+                  <Button variant="inverse" onClick={createNow} loading={isCreating}>
+                    <PlusIcon className="size-4" /> Create your first list
+                  </Button>
+                  <Link href="/pay/new" className="text-sm font-medium text-fg-muted hover:text-fg">
+                    Pay without a list
+                  </Link>
+                </>
+              }
+            />
+          </Card>
         )
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {lists.data.map((list, i) => (
-            <ListCard key={list.id} list={list} index={i} animate={!search} />
-          ))}
-        </ul>
+        <ListsTable lists={lists.data} animate={!search} />
       )}
     </>
   );
 }
 
-/** Cards stagger in on the unfiltered grid; search results just appear (cards are only animated on mount). */
-function ListCard({ list, index, animate }: { list: ListSummary; index: number; animate: boolean }) {
+// One grid for the header and every row, so the columns line up.
+const COLS = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 sm:grid-cols-[minmax(0,1fr)_96px_160px_auto]";
+
+/** Lists as a table: logo and name first, then the facts, then Pay again. Rows fade in on the unfiltered view. */
+function ListsTable({ lists, animate }: { lists: ListSummary[]; animate: boolean }) {
+  return (
+    <Card className="overflow-hidden">
+      <div className={cn(COLS, "hidden border-b border-border bg-surface-sunken px-5 py-2.5 text-xs font-medium text-fg-subtle sm:grid")}>
+        <span>List</span>
+        <span className="text-right">People</span>
+        <span>Updated</span>
+        <span className="sr-only">Actions</span>
+      </div>
+      <ul className="divide-y divide-border">
+        {lists.map((list, i) => (
+          <ListRow key={list.id} list={list} index={i} animate={animate} />
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+function ListRow({ list, index, animate }: { list: ListSummary; index: number; animate: boolean }) {
+  const [logo] = useListLogo(list.id);
+  const empty = list.recipient_count === 0;
   return (
     <motion.li
-      initial={animate ? { opacity: 0, transform: "translateY(8px)" } : false}
-      animate={{ opacity: 1, transform: "translateY(0px)" }}
-      transition={{ duration: 0.25, delay: animate ? Math.min(index, 8) * 0.04 : 0, ease: [0.23, 1, 0.32, 1] }}
+      initial={animate ? { opacity: 0 } : false}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2, delay: animate ? Math.min(index, 8) * 0.03 : 0 }}
+      className={cn(COLS, "relative px-5 py-3 transition-colors duration-150 hover:bg-surface-hover")}
     >
+      {/* The whole row opens the list; Pay again sits above the link. */}
       <Link
         href={`/lists/${list.id}`}
-        className="group flex h-full flex-col rounded-2xl border border-border bg-surface p-5 transition-[border-color,background-color,box-shadow] duration-150 hover:border-border-strong hover:shadow-md"
-      >
-        <div className="flex items-start gap-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface-muted text-fg-muted">
-            <Users className="size-4" />
+        aria-label={`Open ${list.name}`}
+        className="absolute inset-0 outline-offset-[-2px] focus-visible:outline-2 focus-visible:outline-primary"
+      />
+      <div className="flex min-w-0 items-center gap-3">
+        {logo ? (
+          <LogoPreview src={logo} className="size-9" />
+        ) : (
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-surface-muted text-fg-muted">
+            <PeopleIcon className="size-4" />
           </span>
-          <h3 className="min-w-0 flex-1 truncate pt-1.5 text-[15px] font-semibold tracking-[-0.01em]">{list.name}</h3>
-          <ChevronRight className="mt-2 size-4 shrink-0 text-fg-subtle transition-colors duration-150 group-hover:text-fg" />
+        )}
+        <div className="min-w-0">
+          <div className="truncate text-sm font-medium">{list.name}</div>
+          {/* Phones: the facts fold under the name. */}
+          <div className="truncate text-xs text-fg-subtle sm:hidden">
+            {pluralize(list.recipient_count, "person", "people")} · Updated {formatRelative(list.updated_at)}
+          </div>
         </div>
-        <div className="mt-5 flex items-center justify-between text-[13px]">
-          <span className="font-medium tabular">{pluralize(list.recipient_count, "person", "people")}</span>
-          <span className="text-fg-subtle">Updated {formatRelative(list.updated_at)}</span>
-        </div>
-      </Link>
+      </div>
+      <span className="hidden text-right text-sm tabular sm:block">{list.recipient_count.toLocaleString("en-US")}</span>
+      <span className="hidden text-[13px] text-fg-muted sm:block">{formatRelative(list.updated_at)}</span>
+      <div className="relative flex justify-end">
+        {empty ? (
+          <span className="text-[13px] text-fg-subtle">No one yet</span>
+        ) : (
+          <Button asChild size="sm" variant="secondary">
+            <Link href={`/pay/new?list=${list.id}`}>
+              <RepeatIcon className="size-3.5" /> Pay again
+            </Link>
+          </Button>
+        )}
+      </div>
     </motion.li>
   );
 }

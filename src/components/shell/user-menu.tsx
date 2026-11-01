@@ -25,6 +25,32 @@ export function Avatar({ name, email, src, className = "size-8" }: { name?: stri
   );
 }
 
+/** Sidebar footer: who's signed in, with sign out. */
+export function UserCard() {
+  const { user: sessionUser } = useSession();
+  const { data: me } = useMe();
+  const signOut = useSignOut();
+  const user = me ?? sessionUser;
+  if (!user) return null;
+
+  return (
+    <DropdownMenu>
+      <DropdownTrigger className="pressable flex w-full items-center gap-2.5 rounded-lg p-2 text-left hover:bg-surface-hover">
+        <Avatar name={user.full_name} email={user.email} src={user.avatar_url} />
+        <span className="min-w-0 flex-1">
+          {user.full_name && <span className="block truncate text-sm font-medium">{user.full_name}</span>}
+          <span className="block truncate text-xs text-fg-subtle">{user.email}</span>
+        </span>
+      </DropdownTrigger>
+      <DropdownContent className="w-56">
+        <DropdownItem icon={<LogOut />} onSelect={signOut}>
+          Sign out
+        </DropdownItem>
+      </DropdownContent>
+    </DropdownMenu>
+  );
+}
+
 export function UserMenu() {
   const { user: sessionUser } = useSession();
   const { data: me } = useMe();

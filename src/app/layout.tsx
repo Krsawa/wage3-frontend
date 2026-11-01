@@ -1,13 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Doto, Inter_Tight, Roboto_Mono } from "next/font/google";
+import { Doto, Inter, Roboto_Mono } from "next/font/google";
 
 import { DevTools } from "@/components/providers/dev-tools";
 import { Providers } from "@/components/providers";
 
 import "./globals.css";
 
-// Base Sans / Base Mono aren't public; these are the brand's listed fallbacks.
-const interTight = Inter_Tight({ variable: "--font-inter-tight", subsets: ["latin"] });
+// Monument Grotesk for headlines (loaded in globals.css from public/fonts, not committed: it's a
+// commercial font; without the files, headlines fall back to Inter), Inter for body copy.
+// opsz axis: Inter Display is the same family at optical size 32.
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"], axes: ["opsz"] });
+// Base Mono isn't public; Roboto Mono is the brand's listed fallback.
 const robotoMono = Roboto_Mono({ variable: "--font-roboto-mono", subsets: ["latin"] });
 const doto = Doto({ variable: "--font-doto", subsets: ["latin"], weight: ["700", "900"] });
 
@@ -18,17 +21,14 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0b0d" },
-  ],
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${interTight.variable} ${robotoMono.variable} ${doto.variable} h-full`}
+      className={`${inter.variable} ${robotoMono.variable} ${doto.variable} h-full`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">

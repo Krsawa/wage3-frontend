@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
-import { AppNav } from "@/components/shell/app-nav";
+import { AppSidebar, AppTopbar } from "@/components/shell/app-nav";
 import { StatusBanner } from "@/components/shell/status-banner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/lib/auth/use-session";
@@ -37,10 +37,21 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <StatusBanner />
-      <AppNav />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-8 pb-24 sm:px-6 sm:pt-12">{children}</main>
+    // Desktop: the sidebar sits on the frame, and the top bar + page are one panel, rounded at
+    // the top and running off the bottom of the screen like a sheet,
+    // that scrolls on its own. Below lg the panel goes edge to edge.
+    <div className="flex h-dvh bg-surface-sunken">
+      <AppSidebar />
+      <div className="flex min-w-0 flex-1 lg:pt-6 lg:pr-2">
+        <div
+          id="app-scroll"
+          className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-bg lg:rounded-t-2xl lg:border lg:border-b-0 lg:border-border lg:shadow-sm"
+        >
+          <StatusBanner />
+          <AppTopbar />
+          <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 pt-8 pb-24 sm:px-6 sm:pt-10 lg:px-8">{children}</main>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,21 +1,28 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Info } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useConnection } from "wagmi";
 
+import { WalletPromptsInfo } from "@/components/pay/send-card";
 import { RecipientsEditor } from "@/components/recipients/recipients-editor";
+import { ConnectDialog } from "@/components/wallet/connect-dialog";
+import { useUsdcBalance } from "@/components/wallet/wallet-button";
+import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/states";
+import { InfoTip } from "@/components/ui/tooltip";
 import { useCreatePayout, useList, usePayout } from "@/lib/api/queries";
 import { chain, LIMITS, USDC } from "@/lib/config";
 import { formatAmount, formatDate, pluralize } from "@/lib/format";
+import { DISPLAY_FIGURE } from "@/lib/type";
 import {
   emptyRow,
   rowsFromPayoutItems,
@@ -72,6 +79,12 @@ function Source() {
     if (rows.length) initialRows = rows;
     initialName = `${list.data.name} · ${today}`;
     origin = `From your list “${list.data.name}”`;
+  } else if (fromId && from.data && params.get("only") === "unpaid") {
+    // Retry of a partially paid payment: only the people who weren't paid, so nobody is paid twice.
+    const unpaid = from.data.items.filter((i) => i.status !== "paid");
+    initialRows = unpaid.length ? rowsFromPayoutItems(unpaid) : initialRows;
+    initialName = `${from.data.name} (remaining)`;
+    origin = `The ${pluralize(unpaid.length, "person", "people")} from “${from.data.name}” who weren't paid`;
   } else if (fromId && from.data) {
     initialRows = rowsFromPayoutItems(from.data.items);
     initialName = `${from.data.name} (again)`;
@@ -81,7 +94,7 @@ function Source() {
   // Keyed so switching source remounts with fresh state.
   return (
     <Composer
-      key={listId ?? fromId ?? "new"}
+      key={`${listId ?? fromId ?? "new"}-${params.get("only") ?? ""}`}
       listId={listId && list.data ? listId : null}
       initialRows={initialRows}
       initialName={initialName}
@@ -133,59 +146,56 @@ function Composer({
   return (
     <>
       <PageHeader
-        eyebrow={
-          <Link href="/dashboard" className="inline-flex items-center gap-1 hover:text-fg">
-            <ArrowLeft className="size-3.5" /> Home
-          </Link>
-        }
         title="New payment"
         description={origin ?? "Add the people you're paying and how much. You'll review everything before anything is sent."}
       />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-        <div className="flex flex-col gap-6">
+        <div>
+          {/* The main job first (goal-gradient): who and how much. The name is optional, so it follows in the same card. */}
           <Card className="p-5">
-            <Field
-              label="Name"
-              htmlFor="payout-name"
-              hint="Shown in your history. Leave blank for today's date."
-              error={nameError}
-            >
-              <Input
-                id="payout-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={`Payment ${formatDate(new Date().toISOString())}`}
-                invalid={!!nameError}
-              />
-            </Field>
-          </Card>
-
-          <Card className="p-5">
-            <RecipientsEditor rows={rows} onChange={setRows} mode="payout" showAllErrors={attempted} />
+            <RecipientsEditor rows={rows} onChange={setRows} mode="payout" showAllErrors={attempted} flush />
+            <div className="pt-5">
+              <Field
+                label="Name (optional)"
+                htmlFor="payout-name"
+                hint="Shown in your history. Leave blank for today's date."
+                error={nameError}
+              >
+                <Input
+                  id="payout-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={`Payment ${formatDate(new Date().toISOString())}`}
+                  invalid={!!nameError}
+                />
+              </Field>
+            </div>
           </Card>
         </div>
 
         <aside className="lg:sticky lg:top-24">
           <Card className="overflow-hidden">
             <div className="p-5">
-              <div className="text-[13px] text-fg-muted">Total</div>
+              <div className="text-[13px] font-medium text-fg-muted">Total</div>
               <div className="mt-1 flex items-baseline gap-2">
-                <span className="headline text-[40px] tabular">{formatAmount(total)}</span>
-                <span className="text-lg font-medium text-fg-muted">{USDC.symbol}</span>
+                <span className={cn(DISPLAY_FIGURE, "text-[24px]")}>{formatAmount(total)}</span>
+                <span className="text-sm text-fg-muted">{USDC.symbol}</span>
               </div>
               <dl className="mt-5 flex flex-col gap-2.5 text-[13px]">
                 <Row label="People">{validation.filledCount.toLocaleString()}</Row>
-                <Row label="Transactions">{validation.filledCount ? batches : "—"}</Row>
+                {/* Same wording as the send card: one approval plus one transaction per batch of 200. */}
+                <Row label="Wallet prompts" info={<WalletPromptsInfo />}>{validation.filledCount ? `Up to ${batches + 1}` : "—"}</Row>
                 <Row label="Network">
                   <span className="inline-flex items-center gap-1.5">
                     <span className="size-2.5 rounded-[3px] bg-base-blue" /> {chain.name}
                   </span>
                 </Row>
-                <Row label="Token">{USDC.symbol}</Row>
               </dl>
+              <BalanceCheck total={total} />
             </div>
-            <div className="flex flex-col gap-3 border-t border-border bg-surface-sunken p-5">
+            {/* Fill alone separates the action area. The disabled reason sits with the button; the reassurance is set apart. */}
+            <div className="flex flex-col gap-4 bg-surface-sunken p-5">
               {create.error && (
                 <p role="alert" className="rounded-xl bg-danger-soft px-3.5 py-2.5 text-[13px] text-danger-fg">
                   {create.error.message}
@@ -196,11 +206,21 @@ function Composer({
                   {pluralize(validation.invalidCount, "row needs", "rows need")} fixing.
                 </p>
               )}
-              <Button size="lg" className="w-full" onClick={submit} loading={create.isPending}>
-                Review payment <ArrowRight className="size-4" />
-              </Button>
-              <p className="flex items-start gap-1.5 text-xs text-fg-subtle text-pretty">
-                <Info className="mt-px size-3 shrink-0" />
+              <div className="flex flex-col gap-2">
+                <Button
+                  size="lg"
+                  className="w-full"
+                  onClick={submit}
+                  loading={create.isPending}
+                  disabled={!validation.filledCount}
+                >
+                  Review payment <ArrowRight className="size-4" />
+                </Button>
+                {!validation.filledCount && (
+                  <p className="text-center text-[13px] text-fg-muted">Add at least one person to continue.</p>
+                )}
+              </div>
+              <p className="text-center text-xs text-balance text-fg-subtle">
                 Nothing is sent yet. You&apos;ll connect your wallet and sign on the next step.
               </p>
             </div>
@@ -211,10 +231,59 @@ function Composer({
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * Total vs balance while composing. Never blocks: an over-budget payment can still be
+ * saved as a draft. The wallet is only required when sending.
+ */
+function BalanceCheck({ total }: { total: bigint }) {
+  const { isConnected } = useConnection();
+  const balance = useUsdcBalance();
+  const [connectOpen, setConnectOpen] = useState(false);
+
+  if (!isConnected) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setConnectOpen(true)}
+          className="mt-4 text-[13px] text-fg-muted underline-offset-4 hover:text-fg hover:underline"
+        >
+          Connect wallet to check balance
+        </button>
+        <ConnectDialog open={connectOpen} onOpenChange={setConnectOpen} />
+      </>
+    );
+  }
+  if (balance.data === undefined) return null;
+
+  const short = total - balance.data;
+  return (
+    <div
+      className={cn(
+        "mt-4 flex items-center justify-between rounded-xl px-3.5 py-2.5 text-[13px]",
+        short > BigInt(0) ? "bg-danger-soft text-danger-fg" : "bg-surface-muted text-fg-muted",
+      )}
+    >
+      <span>Your balance</span>
+      <span className="font-medium tabular">
+        {formatAmount(balance.data, USDC.decimals, { maxFraction: 2 })} {USDC.symbol}
+        {short > BigInt(0) && <span className="font-normal"> · short {formatAmount(short)}</span>}
+      </span>
+    </div>
+  );
+}
+
+function Row({ label, info, children }: { label: string; info?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between">
-      <dt className="text-fg-subtle">{label}</dt>
+      <dt className="flex items-center gap-1 text-fg-subtle">
+        {label}
+        {info && (
+          <InfoTip label={label} align="start">
+            {info}
+          </InfoTip>
+        )}
+      </dt>
       <dd className="font-medium tabular">{children}</dd>
     </div>
   );
