@@ -216,35 +216,56 @@ function ListEditor({ list }: { list: ListDetail }) {
         {LIMITS.listRecipients.toLocaleString()} people per list; each wallet once.
       </p>
 
-      <AnimatePresence>
-        {dirty && (
-          <motion.div
-            initial={{ transform: "translateY(100%)", opacity: 0 }}
-            animate={{ transform: "translateY(0%)", opacity: 1 }}
-            exit={{ transform: "translateY(100%)", opacity: 0, transition: { duration: 0.16 } }}
-            transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
-            className="fixed inset-x-0 bottom-0 z-30 px-4 pb-4 sm:px-6 sm:pb-6"
-          >
-            <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 shadow-lg">
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium">Unsaved changes</div>
+      {/* Our toast, like the selection toast: dark grey card centred on the content panel, rising
+          out of a blur. It sits a toast-height higher while the selection toast is showing. */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] lg:pl-60 [body:has([data-selection-toast])_&]:-translate-y-15">
+        <AnimatePresence>
+          {dirty && (
+            <motion.div
+              role="status"
+              style={{ transformOrigin: "50% 100%" }}
+              initial={{ opacity: 0, transform: "scale(0.92)", filter: "blur(8px)" }}
+              animate={{ opacity: 1, transform: "scale(1)", filter: "blur(0px)" }}
+              exit={{ opacity: 0, transform: "scale(0.95)", filter: "blur(6px)", transition: { duration: 0.14, ease: [0.23, 1, 0.32, 1] } }}
+              transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
+              // 12px round the buttons on every side, so the corner is concentric: 10px button + 12px = 22px.
+              className="pointer-events-auto flex h-15 w-full max-w-[560px] items-center gap-1 rounded-[22px] bg-[oklch(0.25_0_0)] py-3 pr-3 pl-4 text-white shadow-lg [corner-shape:superellipse(1.5)]"
+            >
+              <div className="mr-auto min-w-0">
+                <div className="truncate text-[15px] leading-5 font-medium">Unsaved changes</div>
+                {/* Dropped on phones (an error still shows), so the title stays on one line. */}
                 <div
                   role={saveError ? "alert" : undefined}
-                  className={cn("text-[13px]", saveError ? "text-danger-fg" : "text-fg-subtle")}
+                  className={cn(
+                    "truncate text-[13px] leading-4",
+                    saveError ? "text-(--red-7)" : "text-white/75 max-sm:hidden",
+                  )}
                 >
                   {saveError ?? "Leaving this page will lose them."}
                 </div>
               </div>
-              <Button variant="ghost" onClick={discard} disabled={replace.isPending}>
+              <button
+                type="button"
+                onClick={discard}
+                disabled={replace.isPending}
+                className="pressable h-9 shrink-0 rounded-[10px] px-2.5 text-[14px] font-semibold whitespace-nowrap hover:bg-white/15 disabled:opacity-45"
+              >
                 Discard
+              </button>
+              <Button
+                onClick={save}
+                loading={replace.isPending}
+                className="ml-1 h-9 rounded-[10px] bg-white px-3.5 text-[14px] font-semibold text-fg hover:bg-(--color-200)"
+              >
+                {/* One span, so the button's flex gap doesn't split the words. */}
+                <span>
+                  Save<span className="max-sm:hidden"> changes</span>
+                </span>
               </Button>
-              <Button variant="inverse" onClick={save} loading={replace.isPending}>
-                Save changes
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       <ConfirmDialog
         open={deleteOpen}

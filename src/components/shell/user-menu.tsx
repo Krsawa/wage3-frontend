@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Mail } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 import {
   DropdownContent,
@@ -10,6 +10,7 @@ import {
   DropdownSeparator,
   DropdownTrigger,
 } from "@/components/ui/dropdown";
+import { MailIcon } from "@/components/ui/icons";
 import { useMe } from "@/lib/api/queries";
 import { useSession, useSignOut } from "@/lib/auth/use-session";
 
@@ -70,7 +71,7 @@ export function UserMenu() {
         <DropdownLabel className="flex flex-col gap-0.5 pb-2">
           {user.full_name && <span className="text-sm font-medium text-fg">{user.full_name}</span>}
           <span className="flex items-center gap-1.5 truncate">
-            <Mail className="size-3" /> {user.email}
+            <MailIcon className="size-3" /> {user.email}
           </span>
         </DropdownLabel>
         <DropdownSeparator />

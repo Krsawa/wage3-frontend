@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ChevronLeftIcon, CloseIcon, DeleteIcon, EqualIcon, FileIcon, ImportIcon, PlusIcon, ShiftIcon, SplitIcon } from "@/components/ui/icons";
+import { ChevronLeftIcon, CloseIcon, DeleteIcon, EqualIcon, FileIcon, ImportIcon, PlusIcon, SplitIcon, HashIcon, CommandIcon } from "@/components/ui/icons";
 import { useRowSelection } from "@/hooks/use-row-selection";
 import { useHydrated } from "@/lib/auth/use-session";
 import { LIMITS, USDC } from "@/lib/config";
@@ -39,6 +39,16 @@ import { ImportDialog, readRecipientsFile, type ParsedImport } from "./import-di
 
 const PAGE = 100;
 
+/**
+ * Row enter/exit. Entering rows dissolve in from a light blur; leaving rows only fade, a
+ * subtler, cheaper exit (dozens can leave at once on Show them). Layout then closes the gap.
+ */
+const ROW_MOTION = {
+  hidden: { opacity: 0, filter: "blur(3px)" },
+  shown: { opacity: 1, filter: "blur(0px)", transition: { duration: 0.22 } },
+  gone: { opacity: 0, transition: { duration: 0.18 } },
+};
+
 const GRID =
   "md:grid-cols-[2.75rem_2rem_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.6fr)_minmax(0,0.9fr)_2.5rem]";
 
@@ -51,6 +61,7 @@ export function RecipientsEditor({
   showAllErrors = false,
   disabled = false,
   flush = false,
+  only = null,
   max = mode === "list" ? LIMITS.listRecipients : LIMITS.payoutItems,
 }: {
   rows: RecipientRow[];
@@ -64,6 +75,8 @@ export function RecipientsEditor({
    * `true` rules it top and bottom (more content follows); "end" also runs it off the card's bottom.
    */
   flush?: boolean | "end";
+  /** Show just these rows (keeping their row numbers), e.g. the ones that can't be paid. */
+  only?: Set<string> | null;
   max?: number;
 }) {
   const [touched, setTouched] = useState<Set<string>>(new Set());
@@ -179,7 +192,10 @@ export function RecipientsEditor({
   };
 
   // Bulk amounts apply to the selection if there is one, else to everyone.
-  const bulkTargets = rows.filter((r) => !isBlankRow(r) && (sel.count === 0 || sel.selected.has(r.key)));
+  // Bulk amounts apply to the selection, else to every row in view (all of them unless filtered).
+  const bulkTargets = rows.filter(
+    (r) => !isBlankRow(r) && (sel.count === 0 ? !only || only.has(r.key) : sel.selected.has(r.key)),
+  );
 
   const applyBulk = (value: string) => {
     const parsed = parseAmount(value);
@@ -202,7 +218,9 @@ export function RecipientsEditor({
     return null;
   };
 
-  const shown = rows.slice(0, visible);
+  // Each row keeps its number in the full list, filtered or not.
+  const numbered = rows.map((r, n) => ({ r, n }));
+  const shown = (only ? numbered.filter(({ r }) => only.has(r.key)) : numbered).slice(0, visible);
   const amountLabel = mode === "list" ? "Default amount" : "Amount";
   const selecting = sel.count > 0;
   // Entering or leaving a selection changes who a bulk amount applies to, so close any open form.
@@ -224,8 +242,15 @@ export function RecipientsEditor({
       {/* Toolbar: totals + tools. Selection actions live in the toast below. */}
       <div className="flex min-h-12 flex-wrap items-center gap-2 pb-4">
         <div className="mr-auto flex items-baseline gap-3">
-          <span className="text-sm font-medium">{pluralize(filledCount, "person", "people")}</span>
-          {total > BigInt(0) && (
+          {/* Filtered, the count says so: "2 of 3 people", with the amount of the rows in view. */}
+          <span className="text-sm font-medium">
+            {only ? `${shown.length} of ${pluralize(filledCount, "person", "people")}` : pluralize(filledCount, "person", "people")}
+          </span>
+          {only ? (
+            <span className="text-sm text-fg-muted tabular">
+              {formatAmount(rowsTotal(rows.filter((r) => only.has(r.key))))} {USDC.symbol}
+            </span>
+          ) : total > BigInt(0) && (
             <span className="text-sm text-fg-muted tabular">
               {formatAmount(total)} {USDC.symbol}
             </span>
@@ -327,7 +352,9 @@ export function RecipientsEditor({
               />
             )}
           </span>
-          <span className="py-2.5 pr-2 text-right">#</span>
+          <span className="flex justify-end py-2.5 pr-2">
+            <HashIcon className="size-3.5" aria-hidden={false} role="img" aria-label="Row" />
+          </span>
           <span className="px-3 py-2.5">Name</span>
           <span className="px-3 py-2.5">Email</span>
           <span className="px-3 py-2.5">Wallet address</span>
@@ -339,17 +366,20 @@ export function RecipientsEditor({
 
         <ul className="divide-y divide-border">
           <AnimatePresence initial={false}>
-            {shown.map((r, i) => {
+            {shown.map(({ r, n: i }) => {
               const blank = isBlankRow(r);
               const checked = sel.selected.has(r.key);
               return (
                 <motion.li
                   key={r.key}
                   data-row={r.key}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0, transition: { duration: 0.1 } }}
-                  transition={{ duration: 0.18 }}
+                  // Rows leaving (Show them, Remove) dissolve; once they're gone the rest glide together.
+                  layout="position"
+                  variants={ROW_MOTION}
+                  initial="hidden"
+                  animate="shown"
+                  exit="gone"
+                  transition={{ layout: { duration: 0.28, ease: [0.32, 0.72, 0, 1] } }}
                   className={cn(
                     "group grid grid-cols-[minmax(0,1fr)_2.5rem] gap-x-2 gap-y-1 p-3 transition-colors duration-100 md:items-start md:gap-0 md:p-0",
                     GRID,
@@ -434,7 +464,7 @@ export function RecipientsEditor({
                     />
                   </div>
                   {!disabled ? (
-                    <div className="col-start-2 row-span-3 row-start-1 flex justify-end md:col-auto md:row-auto md:row-span-1 md:justify-center md:pt-1.5">
+                    <div className="col-start-2 row-span-3 row-start-1 flex justify-end pt-1 md:col-auto md:row-auto md:row-span-1 md:justify-center md:pt-1.5">
                       <Tooltip content="Remove">
                         <button
                           type="button"
@@ -455,7 +485,7 @@ export function RecipientsEditor({
           </AnimatePresence>
         </ul>
 
-        {rows.length > visible && (
+        {!only && rows.length > visible && (
           <button
             type="button"
             onClick={() => setVisible((v) => v + PAGE * 5)}
@@ -465,7 +495,8 @@ export function RecipientsEditor({
           </button>
         )}
 
-        {!disabled && (
+        {/* Hidden while filtered: a new row wouldn't match the filter, so it would appear to do nothing. */}
+        {!disabled && !only && (
           <button
             type="button"
             onClick={addRow}
@@ -476,9 +507,11 @@ export function RecipientsEditor({
             )}
           >
             <PlusIcon className="size-4" /> Add person
-            <span className="ml-auto hidden text-xs font-normal text-fg-subtle sm:inline">
-              Tip: <Kbd><ShiftIcon className="size-3" aria-hidden={false} aria-label="Shift" role="img" /></Kbd> click to select a range,
-              or <Kbd>⌘</Kbd><Kbd>V</Kbd> to paste rows from a spreadsheet
+            <span className="ml-auto hidden items-center gap-1 text-xs font-normal text-fg-subtle sm:inline-flex">
+              <Kbd>
+                <CommandIcon className="size-2.5" strokeWidth={2.5} aria-hidden={false} role="img" aria-label="Command" />
+              </Kbd>
+              <Kbd>V</Kbd> to paste
             </span>
           </button>
         )}
@@ -630,13 +663,17 @@ function SelectionToast({
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:pl-60">
       <motion.div
         role="status"
+        data-selection-toast
         layout
-        initial={{ opacity: 0, transform: "translateY(24px)" }}
-        animate={{ opacity: 1, transform: "translateY(0px)" }}
-        exit={{ opacity: 0, transform: "translateY(16px)", transition: { duration: 0.15 } }}
-        transition={{ type: "spring", duration: 0.35, bounce: 0.15 }}
+        // Scales up out of a blur, and back into one on the way out (origin at its bottom edge).
+        style={{ transformOrigin: "50% 100%" }}
+        initial={{ opacity: 0, transform: "scale(0.92)", filter: "blur(8px)" }}
+        animate={{ opacity: 1, transform: "scale(1)", filter: "blur(0px)" }}
+        exit={{ opacity: 0, transform: "scale(0.95)", filter: "blur(6px)", transition: { duration: 0.14, ease: [0.23, 1, 0.32, 1] } }}
+        transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
         className={cn(
-          "pointer-events-auto flex min-h-13 w-full max-w-[560px] items-center gap-1 rounded-[14px] py-2 pr-2 pl-4 text-white shadow-lg",
+          // 8px round the 10px buttons, so an 18px corner keeps them concentric.
+          "pointer-events-auto flex min-h-13 w-full max-w-[560px] items-center gap-1 rounded-[18px] py-2 pr-2 pl-4 text-white shadow-lg [corner-shape:superellipse(1.5)]",
           TOAST_BG,
         )}
       >
@@ -669,14 +706,15 @@ function SelectionToast({
             <ToastAction onClick={() => onBulk("same")}>Set amount</ToastAction>
             <ToastAction onClick={() => onBulk("split")}>Split</ToastAction>
             <ToastAction onClick={onRemove}>Remove</ToastAction>
-            <Tooltip content="Clear selection (Esc)">
+            {/* Done finishes the edit and clears the selection (the toast leaves with it). It replaces
+                a close ✕ that did the same thing, so there's one way out, styled like Apply. */}
+            <Tooltip content="Finish and clear the selection (Esc)">
               <button
                 type="button"
                 onClick={onClear}
-                className="pressable grid size-9 place-items-center rounded-[10px] text-white/80 hover:bg-white/15 hover:text-white"
-                aria-label="Clear selection"
+                className="pressable ml-1 h-9 shrink-0 rounded-[10px] bg-white px-3.5 text-[14px] font-semibold whitespace-nowrap text-fg hover:bg-(--color-200)"
               >
-                <CloseIcon className="size-4" />
+                Done
               </button>
             </Tooltip>
           </motion.div>
@@ -720,16 +758,19 @@ function Cell({
   selected?: boolean;
 }) {
   return (
-    <div className="min-w-0">
+    <div className="relative min-w-0">
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={!!error || undefined}
         title={error ?? warning}
         className={cn(
-          "h-10 w-full min-w-0 rounded-lg border border-border bg-surface px-3 text-sm outline-none transition-[border-color,box-shadow,background-color] duration-150",
-          "md:h-11 md:rounded-none md:border-transparent md:bg-transparent",
-          "hover:bg-surface-hover focus:border-primary focus:bg-surface focus:shadow-[inset_0_0_0_1px_var(--primary)] md:focus:border-transparent",
+          // Phones: a field like the app's inputs (12px radius, subtle edge that darkens on hover, blue
+          // focus ring). Desktop: a borderless table cell with an inset focus line.
+          "h-10 w-full min-w-0 rounded-xl border border-border-subtle bg-surface px-3 text-sm outline-none transition-[border-color,box-shadow,background-color] duration-150",
+          "hover:border-border focus:border-primary focus:shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_18%,transparent)]",
+          "md:h-11 md:rounded-[6px] md:border-transparent md:bg-transparent md:hover:border-transparent md:hover:bg-surface-hover",
+          "md:focus:border-transparent md:focus:bg-surface md:focus:shadow-[inset_0_0_0_1px_var(--primary)]",
           "placeholder:text-fg-subtle/80 disabled:cursor-default disabled:hover:bg-transparent",
           mono && "font-mono text-[13px] tabular",
           align === "right" && "md:text-right",
@@ -737,12 +778,23 @@ function Cell({
           // Invalid: red fill and a red border (the red scale's border step), on desktop too
           // where table cells are otherwise borderless.
           error && "border-(--red-7) bg-danger-soft/60 text-danger-fg md:border-(--red-7) md:bg-danger-soft/50",
+          // Desktop: the message sits inside the cell's bottom edge, so the value moves up and the
+          // row keeps its 44px height whatever the fault. While editing, the message steps aside and
+          // the value returns to centre.
+          (error || warning) && "peer md:pb-3.5 md:focus:pb-0",
           className,
         )}
         {...props}
       />
       {(error || warning) && (
-        <p className={cn("px-1 pt-1 pb-0.5 text-xs md:px-3 md:pt-0 md:pb-2", error ? "text-danger-fg" : "text-warning-fg")}>
+        <p
+          className={cn(
+            "px-1 pt-1 pb-0.5 text-xs peer-focus:hidden",
+            "md:pointer-events-none md:absolute md:inset-x-3 md:bottom-1.5 md:truncate md:p-0 md:text-[11px] md:leading-[14px]",
+            align === "right" && "md:text-right",
+            error ? "text-danger-fg" : "text-warning-fg",
+          )}
+        >
           {error ?? warning}
         </p>
       )}

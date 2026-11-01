@@ -42,7 +42,7 @@ export function ListCard({ list }: { list: ListSummary }) {
       <div className="mt-6 flex items-end justify-between gap-3">
         <div>
           <div className="text-[13px] text-fg-muted">People</div>
-          <div className={cn(DISPLAY_FIGURE, "mt-1 text-[22px] leading-none")}>{list.recipient_count.toLocaleString("en-US")}</div>
+          <div className={cn(DISPLAY_FIGURE, "mt-1 text-[22px]")}>{list.recipient_count.toLocaleString("en-US")}</div>
         </div>
         {/* An empty list can't be paid: say so instead of showing a dead button. */}
         {empty ? (

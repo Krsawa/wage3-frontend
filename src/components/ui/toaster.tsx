@@ -20,7 +20,8 @@ export function Toaster() {
         unstyled: true,
         classNames: {
           toast:
-            "flex w-full items-center gap-3 rounded-[14px] bg-[oklch(0.25_0_0)] py-3 pr-2 pl-4 font-sans text-white shadow-lg [&_[data-icon]]:hidden",
+            // 16px each side; the right drops to 8px only when an action (Undo…) sits there.
+            "flex w-full items-center gap-3 rounded-[14px] bg-[oklch(0.25_0_0)] px-4 py-3 font-sans text-white shadow-lg has-[[data-button]]:pr-2 [&_[data-icon]]:hidden",
           title: "text-[15px] font-medium leading-5",
           description: "mt-0.5 text-[13px] text-white/80",
           content: "min-w-0 flex-1",

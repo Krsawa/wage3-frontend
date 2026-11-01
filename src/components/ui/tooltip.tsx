@@ -24,6 +24,8 @@ export function Tooltip({
   /** "end" for triggers at a right edge, so the label lines up with them instead of being pushed. */
   align?: "start" | "center" | "end";
 }) {
+  // No content (e.g. a reason that only exists while a button is disabled): just the trigger.
+  if (content == null || content === false || content === "") return <>{children}</>;
   return (
     <T.Root>
       <T.Trigger asChild>{children}</T.Trigger>

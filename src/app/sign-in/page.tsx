@@ -2,7 +2,6 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, Mail } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Suspense,
@@ -18,7 +17,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { ChevronLeftIcon } from "@/components/ui/icons";
+import { ArrowRightIcon, ChevronLeftIcon, MailIcon } from "@/components/ui/icons";
 import { authApi } from "@/lib/api/endpoints";
 import { cn } from "@/lib/cn";
 import { useSession, useSignIn } from "@/lib/auth/use-session";
@@ -192,7 +191,7 @@ function EmailStep({
             inputMode="email"
             autoFocus
             placeholder="you@company.com"
-            leading={<Mail className="size-4" />}
+            leading={<MailIcon className="size-4" />}
             value={email}
             invalid={!!shownError}
             onChange={(e) => {
@@ -203,7 +202,7 @@ function EmailStep({
           />
         </Field>
         <Button type="submit" size="lg" className="w-full" loading={pending}>
-          Continue <ArrowRight className="size-4" />
+          Continue <ArrowRightIcon className="size-4" />
         </Button>
       </form>
 

@@ -1,13 +1,14 @@
 "use client";
 
 import { motion } from "motion/react";
-import { AlertTriangle, RotateCw, WifiOff } from "lucide-react";
+import { RotateCw, WifiOff } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { toApiError } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
 import { Button } from "./button";
+import { WarningIcon } from "@/components/ui/icons";
 
 export function EmptyState({
   icon,
@@ -59,7 +60,7 @@ export function ErrorState({
   compact?: boolean;
 }) {
   const e = toApiError(error);
-  const Icon = e.isNetwork ? WifiOff : AlertTriangle;
+  const Icon = e.isNetwork ? WifiOff : WarningIcon;
 
   if (compact) {
     return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { useState } from "react";
 import { useConnection, useDisconnect, useReadContract, useSwitchChain } from "wagmi";
 
@@ -21,6 +21,7 @@ import { erc20Abi } from "@/lib/contracts";
 import { formatAmount, shortAddress } from "@/lib/format";
 
 import { ConnectDialog } from "./connect-dialog";
+import { WarningIcon } from "@/components/ui/icons";
 
 export function useUsdcBalance() {
   const { address } = useConnection();
@@ -78,7 +79,7 @@ export function WalletButton({
         loading={switching}
         onClick={() => switchChain({ chainId: chain.id })}
       >
-        <AlertTriangle className="size-4" /> Switch to {chain.name}
+        <WarningIcon className="size-4" /> Switch to {chain.name}
       </Button>
     );
   }

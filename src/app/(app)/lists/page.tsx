@@ -43,7 +43,7 @@ export default function ListsPage() {
         title="Lists"
         description="Saved groups of people you pay often. Start a payment from a list and every amount is filled in for you."
         actions={
-          <Button onClick={createNow} loading={isCreating}>
+          <Button onClick={createNow} loading={isCreating} className="h-9">
             <PlusIcon className="size-4" /> New list
           </Button>
         }
@@ -124,8 +124,9 @@ export default function ListsPage() {
   );
 }
 
-// One grid for the header and every row, so the columns line up.
-const COLS = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 sm:grid-cols-[minmax(0,1fr)_96px_160px_auto]";
+// One grid for the header and every row. Each row is its own grid, so every track is a fixed size
+// (no "auto"): an auto action column sized to the header's empty cell would shift the others.
+const COLS = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 sm:grid-cols-[minmax(0,1fr)_96px_160px_128px]";
 
 /** Lists as a table: logo and name first, then the facts, then Pay again. Rows fade in on the unfiltered view. */
 function ListsTable({ lists, animate }: { lists: ListSummary[]; animate: boolean }) {

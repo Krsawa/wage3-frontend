@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowRight, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useConnection } from "wagmi";
@@ -15,13 +15,13 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useUsdcBalance } from "@/components/wallet/wallet-button";
 import { ListCard } from "@/components/lists/list-card";
 import { NewPaymentButton } from "@/components/shell/app-nav";
-import { ImportIcon, PlusIcon, SendIcon, WalletIcon } from "@/components/ui/icons";
+import { ArrowRightIcon, ImportIcon, PlusIcon, SendIcon, WalletIcon } from "@/components/ui/icons";
 import { useLists, useMe, useSentHistory, useStats } from "@/lib/api/queries";
 import type { Stats } from "@/lib/api/types";
 import { useSession } from "@/lib/auth/use-session";
 import { cn } from "@/lib/cn";
 import { USDC } from "@/lib/config";
-import { formatAmount, formatDate, formatRelative, formatToken, pluralize, shortAddress, toApiDate } from "@/lib/format";
+import { formatAmount, formatDate, formatFigure, formatRelative, formatToken, pluralize, shortAddress, toApiDate } from "@/lib/format";
 import { DISPLAY_FIGURE } from "@/lib/type";
 import { SLIDE } from "@/lib/motion";
 
@@ -66,7 +66,7 @@ export default function DashboardPage() {
     <>
       <PageHeader
         title={`${greeting()}${firstName ? `, ${firstName}` : ""}`}
-        description="Send USDC to your team, contributors or community in one go. Settled on Base in seconds."
+        description="Send payments to your team in one go."
       />
 
       {/* The main action on its own line, in its own container, apart from the greeting. */}
@@ -145,7 +145,7 @@ function AttentionBanner() {
           ? `“${attention.data!.items[0].name}” needs attention: some people weren't paid.`
           : `${pluralize(count, "payment needs", "payments need")} attention: some people weren't paid.`}
       </span>
-      <ArrowRight className="size-4" />
+      <ArrowRightIcon className="size-4" />
     </Link>
   );
 }
@@ -302,7 +302,9 @@ function TotalSentStat({ stats, loading }: { stats?: Stats; loading: boolean }) 
       sub={others.length ? `+ ${others.map((t) => formatToken(t.amount, t.token_symbol, t.token_decimals)).join(", ")}` : undefined}
     >
       <>
-        {formatAmount(primary?.amount ?? "0", primary?.token_decimals ?? USDC.decimals, { maxFraction: 2 })}
+        <span title={formatAmount(primary?.amount ?? "0", primary?.token_decimals ?? USDC.decimals, { maxFraction: 2 })}>
+          {formatFigure(primary?.amount ?? "0", primary?.token_decimals ?? USDC.decimals)}
+        </span>
         <span className="ml-1.5 font-sans text-sm font-normal tracking-normal text-fg-muted">{primary?.token_symbol ?? USDC.symbol}</span>
       </>
     </Stat>

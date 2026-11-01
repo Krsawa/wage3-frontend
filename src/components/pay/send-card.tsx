@@ -1,22 +1,23 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { AlertTriangle } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useBalance, useConnection, useSwitchChain } from "wagmi";
 
 import { usePaymentsPaused } from "@/components/shell/status-banner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
+import { Field, Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { InfoTip } from "@/components/ui/tooltip";
+import { InfoTip, Tooltip } from "@/components/ui/tooltip";
 import { ConnectDialog } from "@/components/wallet/connect-dialog";
 import { useUsdcBalance } from "@/components/wallet/wallet-button";
-import { CheckIcon, ExternalIcon, LockIcon, PaperPlaneIcon, ShieldCheckIcon } from "@/components/ui/icons";
+import { CheckIcon, ExternalIcon, LockIcon, PaperPlaneIcon, ShieldCheckIcon, WarningIcon } from "@/components/ui/icons";
 import type { Payout } from "@/lib/api/types";
 import { chain, LIMITS, txUrl, USDC } from "@/lib/config";
 import { cn } from "@/lib/cn";
-import { formatAmount, parseAmount, pluralize, shortAddress } from "@/lib/format";
+import { formatAmount, formatFigure, parseAmount, pluralize, shortAddress } from "@/lib/format";
 import { NO_GAS_MESSAGE, type SendState } from "@/lib/send-payout";
 import { DISPLAY_FIGURE } from "@/lib/type";
 
@@ -55,7 +56,7 @@ export function SendCard({
   const balance = useUsdcBalance();
   const eth = useBalance({ address, chainId: chain.id, query: { enabled: !!address, refetchInterval: 15_000 } });
   const [connectOpen, setConnectOpen] = useState(false);
-  const [typed, setTyped] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const remaining = payout.batches.filter((b) => b.status === "ready");
   const remainingTotal = payout.status === "draft" ? total : remaining.reduce((a, b) => a + BigInt(b.total_amount), BigInt(0));
@@ -70,8 +71,6 @@ export function SendCard({
   const busy = !["idle", "done", "error"].includes(state.step);
   const started = state.step !== "idle";
   const needsTyping = requireTypedTotal && payout.status === "draft" && !started;
-  const typedAmount = parseAmount(typed);
-  const typedOk = typedAmount.ok && BigInt(typedAmount.value) === remainingTotal;
   const blockedReason =
     disabledReason ?? (short ? `Not enough ${USDC.symbol} in this wallet.` : noGas ? NO_GAS_MESSAGE : null);
 
@@ -163,31 +162,31 @@ export function SendCard({
   } else {
     action = (
       <>
-        {needsTyping && (
-          <label className="flex flex-col gap-1.5 text-[13px] text-fg-muted">
-            <span className="text-pretty">
-              This is larger than you usually send. Type <span className="font-medium text-fg tabular">{formatAmount(remainingTotal)}</span> to confirm.
-            </span>
-            <input
-              value={typed}
-              onChange={(e) => setTyped(e.target.value.replace(/[^\d.,]/g, ""))}
-              inputMode="decimal"
-              placeholder={formatAmount(remainingTotal)}
-              aria-label="Type the total to confirm"
-              className="h-10 rounded-lg border border-border bg-surface px-3 font-mono text-sm text-fg tabular outline-none focus:border-primary"
-            />
-          </label>
-        )}
-        <Button
-          size="lg"
-          className="w-full"
-          onClick={state.step === "error" ? onRetry : onSend}
-          loading={busy}
-          disabled={!!blockedReason || count === 0 || (needsTyping && !typedOk)}
-        >
-          {state.step === "error" ? "Try again" : started && payout.status !== "draft" ? "Continue sending" : sendLabel}
-        </Button>
-        {blockedReason && <p className="text-center text-[13px] text-fg-muted text-pretty">{blockedReason}</p>}
+        {/* Why sending is blocked (no USDC, no gas, rows to fix) lives in the button's tooltip. */}
+        <Tooltip content={blockedReason}>
+          <span tabIndex={blockedReason ? 0 : -1} className="block rounded-full">
+            <Button
+              size="lg"
+              className="w-full"
+              // A large payment asks for the total in a dialog first; sending starts once it matches.
+              onClick={state.step === "error" ? onRetry : needsTyping ? () => setConfirmOpen(true) : onSend}
+              loading={busy}
+              disabled={!!blockedReason || count === 0}
+            >
+              {state.step === "error" ? "Try again" : started && payout.status !== "draft" ? "Continue sending" : sendLabel}
+            </Button>
+          </span>
+        </Tooltip>
+        <ConfirmTotalDialog
+          open={confirmOpen}
+          onOpenChange={setConfirmOpen}
+          total={remainingTotal}
+          count={count}
+          onConfirm={() => {
+            setConfirmOpen(false);
+            onSend();
+          }}
+        />
       </>
     );
   }
@@ -196,14 +195,14 @@ export function SendCard({
     <Card className="overflow-hidden">
       <div className="p-5">
         <div className="text-[13px] font-medium text-fg-muted">{payout.status === "draft" ? "You're sending" : "Left to send"}</div>
-        <div className="mt-1 flex items-baseline gap-2">
-          <span className={cn(DISPLAY_FIGURE, "text-[24px]")}>{formatAmount(remainingTotal)}</span>
+        <div className="mt-2 flex items-baseline gap-2">
+          <span className={cn(DISPLAY_FIGURE, "text-[24px]")} title={`${formatAmount(remainingTotal)} ${USDC.symbol}`}>{formatFigure(remainingTotal)}</span>
           <span className="text-sm text-fg-muted">{USDC.symbol}</span>
         </div>
         {/* Same rows as the New payment summary: label left, value right. */}
         <dl className="mt-5 flex flex-col gap-2.5 text-[13px]">
           <Meta label="Recipients">{pluralize(count, "person", "people")}</Meta>
-          <Meta label="Wallet prompts" info={<WalletPromptsInfo />}>Up to {signatures}</Meta>
+          <Meta label="Permissions required" info={<WalletPromptsInfo />}>Up to {signatures}</Meta>
           <Meta label="Network">
             <span className="inline-flex items-center gap-1.5">
               <span className="size-2.5 rounded-[3px] bg-base-blue" />
@@ -257,10 +256,6 @@ export function SendCard({
             </a>
           )}
         </div>
-        {/* Set apart from the action, centred like the note on New payment. */}
-        <p className="text-center text-xs text-balance text-fg-subtle">
-          Wage3 never holds your funds. {USDC.symbol} goes straight from your wallet to each person.
-        </p>
       </div>
     </Card>
   );
@@ -313,7 +308,7 @@ function Step({ label, detail, status, icon, last }: { label: ReactNode; detail?
             ) : status === "active" ? (
               <Spinner className="size-3.5" />
             ) : status === "error" ? (
-              <AlertTriangle className="size-3.5" />
+              <WarningIcon className="size-3.5" />
             ) : (
               icon
             )}
@@ -337,18 +332,99 @@ function Notice({ tone, children }: { tone: "warning" | "danger"; children: Reac
         tone === "warning" ? "bg-warning-soft text-warning-fg" : "bg-danger-soft text-danger-fg",
       )}
     >
-      <AlertTriangle className="mt-px size-4 shrink-0" />
+      <WarningIcon className="mt-px size-4 shrink-0" />
       <div>{children}</div>
     </div>
   );
 }
 
-/** What "Wallet prompts" counts. Shared with the New payment summary. */
+/** What "Permissions required" counts. Shared with the New payment summary. */
 export function WalletPromptsInfo() {
   return (
     <>
       One to confirm the exact {USDC.symbol} total, then one per transaction of up to {LIMITS.batchSize} people. Your
       wallet asks you to approve each.
     </>
+  );
+}
+
+/**
+ * Friction for a payment well above what this sender usually sends: type the total to go on.
+ * Sending can't be undone, so a stray zero has to be noticed here, not after.
+ */
+export function ConfirmTotalDialog({
+  open,
+  onOpenChange,
+  total,
+  count,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  total: bigint;
+  count: number;
+  onConfirm: () => void;
+}) {
+  const [typed, setTyped] = useState("");
+  const typedAmount = parseAmount(typed);
+  const ok = typedAmount.ok && BigInt(typedAmount.value) === total;
+  // Only flag a mismatch once they've typed as many characters as the total has.
+  const wrong = !ok && typed.replace(/,/g, "").length >= formatAmount(total).replace(/,/g, "").length;
+  const close = () => {
+    setTyped("");
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => (o ? onOpenChange(true) : close())}
+      title="Confirm a large payment"
+      description="This is more than you usually send. Type the total to confirm it's right."
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!ok) return;
+          setTyped("");
+          onConfirm();
+        }}
+      >
+        {/* 24px from the description (heading → content), then the figure on whole-pixel lines:
+            13/20 label, 22/28 figure, 13/20 who. */}
+        <div className="mt-1 rounded-xl bg-surface-muted px-4 py-3">
+          <div className="text-[13px] leading-5 text-fg-muted">You&apos;re sending</div>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className={cn(DISPLAY_FIGURE, "min-w-0 text-[22px] [line-height:28px] break-all")}>{formatAmount(total)}</span>
+            <span className="text-sm text-fg-muted">{USDC.symbol}</span>
+          </div>
+          <div className="text-[13px] leading-5 text-fg-muted">to {pluralize(count, "person", "people")}</div>
+        </div>
+        <div className="mt-4">
+          <Field label="Type the total" htmlFor="confirm-total" error={wrong ? "That doesn't match the total" : null}>
+            <Input
+              id="confirm-total"
+              autoFocus
+              autoComplete="off"
+              inputMode="decimal"
+              value={typed}
+              invalid={wrong}
+              onChange={(e) => setTyped(e.target.value.replace(/[^\d.,]/g, ""))}
+              placeholder="0.00"
+              // The figure's face, not mono, so the typed total reads like the one above it.
+              className="font-[family-name:var(--font-inter)] tabular"
+            />
+          </Field>
+        </div>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={close}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={!ok}>
+            Send payment
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }

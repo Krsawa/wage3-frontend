@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Calendar, CalendarFooter, formatYmd, type YmdRange } from "@/components/ui/date-picker";
 import {
   DropdownContent,
+  DropdownItem,
   DropdownLabel,
   DropdownMenu,
   DropdownRadioGroup,
@@ -54,7 +55,7 @@ export default function HistoryPage() {
         title="History"
         description="Every payment you've sent from Wage3, confirmed on Base."
         actions={
-          <Button asChild variant="inverse">
+          <Button asChild variant="inverse" className="h-9">
             <Link href="/pay/new">
               <PlusIcon className="size-4" /> New payment
             </Link>
@@ -287,6 +288,8 @@ function FiltersMenu({
 }) {
   const preset = presetFor(from, to);
   const time = (from || to) && !preset ? "custom" : (preset?.id ?? "all");
+  // Open by default when a custom range is already set, so it's visible where it lives.
+  const [customOpen, setCustomOpen] = useState(time === "custom");
   const active = (listId ? 1 : 0) + (from || to ? 1 : 0);
   // Short (no year) so it fits the menu's hint column.
   const short = (v: string) => formatYmd(v).replace(/ \d{4}$/, "");
@@ -348,7 +351,7 @@ function FiltersMenu({
 
         <DropdownSub>
           <DropdownSubTrigger hint={timeName}>Time</DropdownSubTrigger>
-          <DropdownSubContent className="w-56">
+          <DropdownSubContent className={customOpen ? "w-[266px]" : "w-56"}>
             <DropdownRadioGroup
               value={time}
               onValueChange={(v) =>
@@ -367,10 +370,21 @@ function FiltersMenu({
               ))}
             </DropdownRadioGroup>
             <DropdownSeparator />
-            {/* Custom range: the calendar opens right here, a third level in. */}
-            <DropdownSub>
-              <DropdownSubTrigger>Custom range</DropdownSubTrigger>
-              <DropdownSubContent className="w-[266px]">
+            {/* Custom range expands the calendar in place, inside this submenu, instead of a
+                third flyout that could open off to the side, far from what was clicked. */}
+            <DropdownItem
+              onSelect={(e) => {
+                e.preventDefault();
+                setCustomOpen((o) => !o);
+              }}
+              aria-expanded={customOpen}
+            >
+              <span className="flex-1">Custom range</span>
+              {time === "custom" && <span className="text-[13px] text-fg-subtle">{rangeName}</span>}
+              <ChevronRightIcon className={cn("size-4 text-fg-subtle transition-transform duration-150", customOpen && "rotate-90")} />
+            </DropdownItem>
+            {customOpen && (
+              <div className="w-[256px] px-px">
                 <Calendar
                   mode="range"
                   value={time === "custom" ? { from, to } : { from: "", to: "" }}
@@ -387,8 +401,8 @@ function FiltersMenu({
                     Clear
                   </button>
                 </CalendarFooter>
-              </DropdownSubContent>
-            </DropdownSub>
+              </div>
+            )}
           </DropdownSubContent>
         </DropdownSub>
       </DropdownContent>

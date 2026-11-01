@@ -6,17 +6,18 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Address } from "@/components/ui/address";
+import { RecipientReceipt } from "@/components/pay/recipient-receipt";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { BatchStatusBadge, ItemStatusBadge } from "@/components/ui/status-badge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { CheckCircleIcon, DownloadIcon, ExternalIcon, SearchIcon } from "@/components/ui/icons";
-import type { Payout } from "@/lib/api/types";
+import type { Payout, PayoutItem } from "@/lib/api/types";
 import { chain, txUrl, USDC } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { downloadPayoutCsv } from "@/lib/export-payout";
-import { formatAmount, formatDateTime, pluralize, shortAddress } from "@/lib/format";
+import { formatAmount, formatDateTime, formatFigure, pluralize, shortAddress } from "@/lib/format";
 import { DISPLAY_FIGURE } from "@/lib/type";
 
 /** Progress hero for a payout that has started sending. */
@@ -57,7 +58,7 @@ export function PayoutProgress({ payout }: { payout: Payout }) {
           </div>
           {/* Money in the display figure like every other amount; the one big number on the page. */}
           <div className="mt-3 flex items-baseline gap-2">
-            <span className={cn(DISPLAY_FIGURE, "text-[40px]")}>{formatAmount(payout.total_amount, decimals)}</span>
+            <span className={cn(DISPLAY_FIGURE, "text-[40px]")} title={formatAmount(payout.total_amount, decimals)}>{formatFigure(payout.total_amount, decimals)}</span>
             <span className="text-base text-fg-muted">{symbol}</span>
           </div>
           <div className="mt-1 text-sm text-fg-muted">
@@ -134,6 +135,13 @@ export function ItemsTable({ payout }: { payout: Payout }) {
   const [visible, setVisible] = useState(PAGE);
   const decimals = payout.token_decimals ?? USDC.decimals;
   const showStatus = payout.status !== "draft";
+  // The person whose receipt is in the drawer (kept while it closes).
+  const [receipt, setReceipt] = useState<PayoutItem | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const openReceipt = (i: PayoutItem) => {
+    setReceipt(i);
+    setReceiptOpen(true);
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -191,9 +199,29 @@ export function ItemsTable({ payout }: { payout: Payout }) {
           </thead>
           <tbody className="divide-y divide-border">
             {filtered.slice(0, visible).map((i) => (
-              <tr key={i.id} className="group">
+              // Sent payments: the whole row opens that person's receipt. The name is a real button
+              // for keyboards; the wallet's copy/explorer actions stop the click from reaching the row.
+              <tr
+                key={i.id}
+                onClick={showStatus ? () => openReceipt(i) : undefined}
+                className={cn("group", showStatus && "cursor-pointer transition-colors duration-100 hover:bg-surface-hover")}
+              >
                 <td className="max-w-56 px-5 py-3">
-                  <div className="truncate font-medium">{i.name || <span className="font-normal text-fg-subtle">No name</span>}</div>
+                  {showStatus ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openReceipt(i);
+                      }}
+                      className="block max-w-full truncate text-left font-medium outline-offset-2"
+                      aria-label={`View receipt for ${i.name || i.wallet_address}`}
+                    >
+                      {i.name || <span className="font-normal text-fg-subtle">No name</span>}
+                    </button>
+                  ) : (
+                    <div className="truncate font-medium">{i.name || <span className="font-normal text-fg-subtle">No name</span>}</div>
+                  )}
                   {i.email && <div className="truncate text-xs text-fg-subtle">{i.email}</div>}
                 </td>
                 <td className="px-3 py-3">
@@ -211,6 +239,7 @@ export function ItemsTable({ payout }: { payout: Payout }) {
         </table>
         {!filtered.length && <p className="px-5 py-8 text-center text-sm text-fg-muted">No one matches “{query}”.</p>}
       </div>
+      <RecipientReceipt payout={payout} item={receipt} open={receiptOpen} onOpenChange={setReceiptOpen} />
       {filtered.length > visible && (
         <button
           type="button"

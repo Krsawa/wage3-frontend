@@ -11,10 +11,12 @@ import { getConnection } from "wagmi/actions";
 import { ChevronRightIcon, ExternalIcon, HashIcon, HistoryIcon, HomeIcon, ListIcon, PaymentIcon, PlusIcon, SearchIcon, SettingsIcon } from "@/components/ui/icons";
 import { Logo } from "@/components/ui/logo";
 import { Button } from "@/components/ui/button";
+import { WalletWalkthrough } from "@/components/onboarding/wallet-walkthrough";
 import { ConnectDialog } from "@/components/wallet/connect-dialog";
 import { WalletButton } from "@/components/wallet/wallet-button";
 import { addressUrl, BATCHER_ADDRESS } from "@/lib/config";
 import { cn } from "@/lib/cn";
+import { useLocalValue } from "@/lib/local-prefs";
 
 import { UserCard } from "./user-menu";
 
@@ -272,15 +274,18 @@ export function AppTopbar() {
 }
 
 /**
- * "New payment" on the home page. With no wallet connected it opens the wallet picker
- * first, then carries on to /pay/new once the wallet connects. Closing the picker without
- * connecting drops the intent, so a later connect doesn't jump pages unexpectedly.
+ * "New payment" on the home page. The first time, it opens a short walkthrough (get a wallet,
+ * fund it, how paying works). Then, with no wallet connected, it opens the wallet picker and
+ * carries on to /pay/new once the wallet connects. Closing the picker without connecting drops
+ * the intent, so a later connect doesn't jump pages unexpectedly.
  */
 export function NewPaymentButton({ className }: { className?: string }) {
   const { isConnected } = useConnection();
   const config = useConfig();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [onboarded, setOnboarded] = useLocalValue("wage3.onboarded");
   const heading = useRef(false);
 
   useEffect(() => {
@@ -290,7 +295,16 @@ export function NewPaymentButton({ className }: { className?: string }) {
     }
   }, [isConnected, router]);
 
-  if (isConnected) {
+  // After the walkthrough (finished or skipped): remember it, then carry on as a normal click.
+  const proceed = () => {
+    setOnboarded("1");
+    setGuideOpen(false);
+    if (getConnection(config).isConnected) return router.push("/pay/new");
+    heading.current = true;
+    setOpen(true);
+  };
+
+  if (isConnected && onboarded) {
     return (
       <Button asChild size="sm" className={className}>
         <Link href="/pay/new">
@@ -306,12 +320,20 @@ export function NewPaymentButton({ className }: { className?: string }) {
         size="sm"
         className={className}
         onClick={() => {
+          if (!onboarded) return setGuideOpen(true);
           heading.current = true;
           setOpen(true);
         }}
       >
         <PlusIcon className="size-4" /> New payment
       </Button>
+      <WalletWalkthrough
+        open={guideOpen}
+        onOpenChange={setGuideOpen}
+        onDone={proceed}
+        // One label either way; without a wallet it opens the wallet picker next.
+        doneLabel="Get started"
+      />
       <ConnectDialog
         open={open}
         onOpenChange={(o) => {

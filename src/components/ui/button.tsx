@@ -38,8 +38,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   ref,
 ) {
   const classes = cn(
-    "pressable relative inline-flex shrink-0 select-none items-center justify-center rounded-full font-medium whitespace-nowrap",
-    "disabled:pointer-events-none disabled:opacity-45",
+    "pressable relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full font-medium whitespace-nowrap",
+    // Loading also disables the button, but it shouldn't look switched off: fade only real disabled.
+    "disabled:pointer-events-none [&:disabled:not([aria-busy])]:opacity-45",
     variants[variant],
     sizes[size],
     className,
@@ -61,23 +62,43 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       aria-busy={loading || undefined}
       {...props}
     >
-      {/* Content blurs out under the spinner instead of swapping abruptly. */}
-      <span
-        className={cn(
-          "inline-flex items-center gap-[inherit] transition-[filter,opacity] duration-200",
-          loading && "opacity-0 blur-[2px]",
-        )}
+      {/* Loading: the label dips 3px, then springs up 10px and blurs out; the spinner does the
+          mirror (drops in from above, overshoots 3px, settles, un-blurs). Transform, blur and
+          opacity only; the button clips them. When loading ends the label settles back in. */}
+      <motion.span
+        className="inline-flex items-center gap-[inherit]"
+        initial={false}
+        animate={
+          loading
+            ? { y: [0, 3, -10], opacity: [1, 1, 0], filter: ["blur(0px)", "blur(0px)", "blur(6px)"] }
+            : { y: 0, opacity: 1, filter: "blur(0px)" }
+        }
+        // Per property: the dip plays fully visible, then the fade and blur ride the spring up.
+        transition={
+          loading
+            ? {
+                y: { duration: 0.36, times: [0, 0.35, 1], ease: "easeOut" },
+                opacity: { duration: 0.2, delay: 0.12, times: [0, 0, 1], ease: "easeOut" },
+                filter: { duration: 0.2, delay: 0.12, times: [0, 0, 1], ease: "easeOut" },
+              }
+            : { duration: 0.24, ease: [0.23, 1, 0.32, 1] }
+        }
       >
         {children}
-      </span>
+      </motion.span>
       <AnimatePresence>
         {loading && (
           <motion.span
             className="absolute inset-0 grid place-items-center"
-            initial={{ opacity: 0, transform: "scale(0.8)" }}
-            animate={{ opacity: 1, transform: "scale(1)" }}
-            exit={{ opacity: 0, transform: "scale(0.8)" }}
-            transition={{ duration: 0.15 }}
+            initial={{ y: -10, opacity: 0, filter: "blur(6px)" }}
+            animate={{ y: [-10, 3, 0], opacity: [0, 1, 1], filter: ["blur(6px)", "blur(0px)", "blur(0px)"] }}
+            exit={{ y: 10, opacity: 0, filter: "blur(6px)", transition: { duration: 0.18 } }}
+            // Starts as the label lifts away, so the two hand over instead of overlapping.
+            transition={{
+              y: { duration: 0.36, delay: 0.14, times: [0, 0.65, 1], ease: "easeOut" },
+              opacity: { duration: 0.18, delay: 0.14, times: [0, 1, 1], ease: "easeOut" },
+              filter: { duration: 0.24, delay: 0.14, times: [0, 1, 1], ease: "easeOut" },
+            }}
           >
             <Spinner className="size-4" />
           </motion.span>

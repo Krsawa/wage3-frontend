@@ -1,11 +1,12 @@
 "use client";
 
-import { AlertTriangle, RotateCw } from "lucide-react";
+import { RotateCw } from "lucide-react";
 import Link from "next/link";
 import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
+import { WarningIcon } from "@/components/ui/icons";
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
@@ -21,7 +22,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
       </header>
       <main role="alert" className="flex flex-1 flex-col items-center justify-center px-4 pb-24 text-center">
         <div className="grid size-12 place-items-center rounded-2xl bg-danger-soft text-danger-fg">
-          <AlertTriangle className="size-5" />
+          <WarningIcon className="size-5" />
         </div>
         <h1 className="headline mt-6 text-[26px] sm:text-[30px]">Something went wrong</h1>
         <p className="mt-3 max-w-sm text-[15px] text-fg-muted text-pretty">

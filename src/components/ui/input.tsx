@@ -73,13 +73,13 @@ export function Field({
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       {label && (
-        <label htmlFor={htmlFor} className="text-[13px] font-medium text-fg">
+        <label htmlFor={htmlFor} className="text-[13px] leading-5 font-medium text-fg">
           {label}
         </label>
       )}
       {children}
       {error ? (
-        <p role="alert" className="text-[13px] text-danger-fg">
+        <p role="alert" className="text-[13px] leading-5 text-danger-fg">
           {error}
         </p>
       ) : hint ? (

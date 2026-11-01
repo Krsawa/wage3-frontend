@@ -1,14 +1,14 @@
 "use client";
 
 import { motion, type Variants } from "motion/react";
-import { ArrowRight, ArrowUpRight, KeyRound, PenLine, ScanSearch, Zap } from "lucide-react";
+import { ArrowUpRight, KeyRound, PenLine, ScanSearch, Zap } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { StatusBanner } from "@/components/shell/status-banner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileIcon, ShieldCheckIcon } from "@/components/ui/icons";
+import { ArrowRightIcon, FileIcon, ShieldCheckIcon } from "@/components/ui/icons";
 import { Logo, LogoMark } from "@/components/ui/logo";
 import { useSession } from "@/lib/auth/use-session";
 import { chain } from "@/lib/config";
@@ -45,7 +45,7 @@ function PrimaryCta({ size = "lg" }: { size?: "md" | "lg" }) {
   return (
     <Button asChild size={size}>
       <Link href={isAuthenticated ? "/dashboard" : "/sign-in"}>
-        {isAuthenticated ? "Open app" : "Get started"} <ArrowRight className="size-4" />
+        {isAuthenticated ? "Open app" : "Get started"} <ArrowRightIcon className="size-4" />
       </Link>
     </Button>
   );

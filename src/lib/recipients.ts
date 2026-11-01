@@ -2,7 +2,7 @@ import Papa from "papaparse";
 
 import type { PayoutItem, PayoutItemInput, Recipient, RecipientInput } from "@/lib/api/types";
 
-import { parseAmount, toInputAmount, validateEmail, validateWallet } from "./format";
+import { cleanWallet, parseAmount, toInputAmount, validateEmail, validateWallet } from "./format";
 
 /** One editable row. `amount` is what the user typed (display units), not base units. */
 export type RecipientRow = {
@@ -181,6 +181,7 @@ export function parseRecipientsText(text: string): ImportResult {
       }
     }
     row.amount = row.amount.replace(/^\$/, "").replace(/,/g, "");
+    row.wallet = cleanWallet(row.wallet);
     if (isBlankRow(row)) {
       skipped++;
       continue;

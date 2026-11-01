@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "motion/react";
-import { AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -12,6 +11,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { toApiError } from "@/lib/api/client";
 import { authApi } from "@/lib/api/endpoints";
 import { useSignIn } from "@/lib/auth/use-session";
+import { WarningIcon } from "@/components/ui/icons";
 
 const ERRORS: Record<string, string> = {
   access_denied: "You cancelled Google sign-in.",
@@ -82,7 +82,7 @@ function Callback() {
       className="rounded-3xl border border-border bg-surface p-8 text-center"
     >
       <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-danger-soft text-danger-fg">
-        <AlertTriangle className="size-5" />
+        <WarningIcon className="size-5" />
       </div>
       <h1 className="mt-5 text-lg font-semibold tracking-[-0.02em]">Couldn&apos;t sign you in</h1>
       <p className="mt-2 text-sm text-fg-muted text-pretty">{error}</p>

@@ -79,7 +79,7 @@ export function ExternalIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** Hash: an on-chain address or contract. */
+/** Hash: an on-chain address or contract, and the row-number column. */
 export function HashIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden {...props}>
@@ -480,6 +480,84 @@ export function SettingsIcon(props: SVGProps<SVGSVGElement>) {
         strokeWidth="2"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+/** Short dash: a list marker. */
+export function DashIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden {...props}>
+      <path d="M7 12H17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Envelope: email. */
+export function MailIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden {...props}>
+      <path
+        d="M21 8H20V16H21H22V8H21ZM6 5V6H18V5V4H6V5ZM3 16H4V8H3H2V16H3ZM18 19V18H6V19V20H18V19ZM3 16H2C2 18.2091 3.79086 20 6 20V19V18C4.89543 18 4 17.1046 4 16H3ZM6 5V4C3.79086 4 2 5.79086 2 8H3H4C4 6.89543 4.89543 6 6 6V5ZM21 16H20C20 17.1046 19.1046 18 18 18V19V20C20.2092 20 22 18.2091 22 16H21ZM21 8H22C22 5.79086 20.2092 4 18 4V5V6C19.1046 6 20 6.89543 20 8H21Z"
+        fill="currentColor"
+      />
+      <path d="M21 8.5L13.3416 12.3292C12.497 12.7515 11.5029 12.7515 10.6583 12.3292L3 8.5" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Warning triangle (user's icon). Stroke on the svg, like CheckIcon. */
+export function WarningIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden
+      {...props}
+    >
+      <path d="M12 8.8846V11.9192M12 15H12.01M9.48223 4.43254L3.45153 14.3633C2.22395 16.3848 3.64405 19 5.9693 19H18.0307C20.3559 19 21.7761 16.3848 20.5485 14.3633L14.5178 4.43254C13.3578 2.52249 10.6422 2.52249 9.48223 4.43254ZM12.25 15C12.25 15.1381 12.1381 15.25 12 15.25C11.8619 15.25 11.75 15.1381 11.75 15C11.75 14.8619 11.8619 14.75 12 14.75C12.1381 14.75 12.25 14.8619 12.25 15Z" />
+    </svg>
+  );
+}
+
+/** Right arrow (user's icon), e.g. "Review payment →". Stroke on the svg, like CheckIcon. */
+export function ArrowRightIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      {...props}
+    >
+      <path d="M14 6L20 12L14 18" />
+      <path d="M19 12H4" />
+    </svg>
+  );
+}
+
+/** Command key (user's icon), for the ⌘ V hint. Stroke on the svg, like CheckIcon. */
+export function CommandIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="square"
+      aria-hidden
+      {...props}
+    >
+      <path d="M9 9V6.5C9 5.11929 7.88071 4 6.5 4C5.11929 4 4 5.11929 4 6.5C4 7.88071 5.11929 9 6.5 9H9ZM9 9H15M9 9V15M15 9V6.5C15 5.11929 16.1193 4 17.5 4C18.8807 4 20 5.11929 20 6.5C20 7.88071 18.8807 9 17.5 9H15ZM15 9V15M15 15H9M15 15V17.5C15 18.8807 16.1193 20 17.5 20C18.8807 20 20 18.8807 20 17.5C20 16.1193 18.8807 15 17.5 15H15ZM9 15V17.5C9 18.8807 7.88071 20 6.5 20C5.11929 20 4 18.8807 4 17.5C4 16.1193 5.11929 15 6.5 15H9Z" />
     </svg>
   );
 }

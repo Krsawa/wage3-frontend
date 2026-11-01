@@ -11,13 +11,17 @@ import { formatAmount, formatRelative, parseAmount, shortAddress } from "./forma
 import { isBlankRow, type RecipientRow } from "./recipients";
 
 /** Sent money can't be pulled back, so these flags are shown before anyone signs. */
-export type RowFlag = { key: string; who: string; reason: string };
+export type FlagKind = "wallet-changed" | "new-address" | "above-last" | "outlier";
+/** `reason` is the row's own detail ("was 0x12…ab", "6,000.00, was 2,500.00"); the group title says the rest. */
+export type RowFlag = { key: string; who: string; reason: string; kind: FlagKind };
 
 // Over this, a new sender types the total to confirm. Senders with history use 2× their median.
 const NEW_SENDER_CONFIRM = parseUnits("10000", USDC.decimals);
 const HISTORY_FOR_MEDIAN = 3;
 // A row this many times the batch median is probably a typo (2500 typed as 25000).
 const BATCH_OUTLIER = BigInt(5);
+// More "outliers" than this share of the payment is a second pay tier, not typos: don't flag them.
+const OUTLIER_SHARE = 0.1;
 // A person paid this many times their last amount from the same list.
 const PERSON_OUTLIER = BigInt(2);
 const RECENT_MS = 24 * 3_600_000;
@@ -54,6 +58,7 @@ export function useReviewChecks(payout: Payout, rows: RecipientRow[], total: big
     const requireTypedTotal = total > (usual ? usual * BigInt(2) : NEW_SENDER_CONFIRM);
 
     const flags: RowFlag[] = [];
+    const outliers: RowFlag[] = [];
     const prevItems = previous.data?.items ?? [];
     const prevByWallet = new Map(prevItems.map((i) => [i.wallet_address.toLowerCase(), i]));
     const batchMedian = filled.length >= 3 ? median(filled.map(amountOf).filter((a): a is bigint => a !== null)) : null;
@@ -72,24 +77,23 @@ export function useReviewChecks(payout: Payout, rows: RecipientRow[], total: big
         flags.push({
           key: r.key,
           who: label(r),
-          reason: sameName
-            ? `Wallet changed since the last payment (was ${shortAddress(sameName.wallet_address)})`
-            : "New address, not in the last payment from this list",
+          kind: sameName ? "wallet-changed" : "new-address",
+          reason: sameName ? `was ${shortAddress(sameName.wallet_address)}` : shortAddress(r.wallet.trim()),
         });
       } else if (before && amount !== null && amount > BigInt(before.amount) * PERSON_OUTLIER) {
         flags.push({
           key: r.key,
           who: label(r),
-          reason: `${formatAmount(amount)} is more than double last time (${formatAmount(before.amount)})`,
+          kind: "above-last",
+          reason: `${formatAmount(amount)}, was ${formatAmount(before.amount)}`,
         });
       } else if (!before && batchMedian && amount !== null && amount > batchMedian * BATCH_OUTLIER) {
-        flags.push({
-          key: r.key,
-          who: label(r),
-          reason: `${formatAmount(amount)} is far above the others in this payment`,
-        });
+        outliers.push({ key: r.key, who: label(r), kind: "outlier", reason: formatAmount(amount) });
       }
     }
+
+    // A typo is rare: a handful of rows far above the median. Dozens are a deliberate tier.
+    if (outliers.length <= Math.max(2, Math.ceil(filled.length * OUTLIER_SHARE))) flags.push(...outliers);
 
     const sentAt = last?.sent_at ?? last?.created_at;
     const recentDuplicate =
@@ -97,6 +101,6 @@ export function useReviewChecks(payout: Payout, rows: RecipientRow[], total: big
         ? `You paid this list ${formatRelative(sentAt)}. Check this isn't a repeat.`
         : null;
 
-    return { flags, requireTypedTotal, recentDuplicate };
+    return { flags, checked: filled.length, requireTypedTotal, recentDuplicate };
   }, [rows, total, history.data, previous.data, last, payout.id, openedAt]);
 }

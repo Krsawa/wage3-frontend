@@ -20,6 +20,8 @@ export function Dialog({
   description,
   children,
   footer,
+  footerClassName,
+  media,
   className,
   dismissible = true,
 }: {
@@ -29,6 +31,10 @@ export function Dialog({
   description?: ReactNode;
   children?: ReactNode;
   footer?: ReactNode;
+  /** Overrides for the footer row, e.g. no sunken fill. */
+  footerClassName?: string;
+  /** Full-bleed area above the title (an illustration or animation); the close button floats on it. */
+  media?: ReactNode;
   className?: string;
   /** False while something irreversible is in flight (e.g. a wallet prompt). */
   dismissible?: boolean;
@@ -70,7 +76,8 @@ export function Dialog({
                     transition: { duration: 0.15, ease: [0.23, 1, 0.32, 1] },
                   }}
                 >
-                  <div className="flex items-start justify-between gap-4 px-6 pt-6">
+                  {media && <div className="shrink-0">{media}</div>}
+                  <div className={cn("flex items-start justify-between gap-4 px-6", media ? "pt-5" : "pt-6")}>
                     <div className="min-w-0 flex-1">
                       <D.Title className="headline text-[20px] leading-7 font-normal text-balance">
                         {title}
@@ -85,7 +92,11 @@ export function Dialog({
                     </div>
                     {dismissible && (
                       <D.Close
-                        className="pressable -mt-1 -mr-2.5 grid size-9 shrink-0 place-items-center rounded-full text-fg-subtle hover:bg-surface-hover hover:text-fg"
+                        className={cn(
+                          "pressable grid size-9 shrink-0 place-items-center rounded-full text-fg-subtle hover:bg-surface-hover hover:text-fg",
+                          // On media it floats in the corner, on a white disc so it reads over any art.
+                          media ? "absolute top-3 right-3 bg-surface/90 shadow-(--shadow-xs) backdrop-blur" : "-mt-1 -mr-2.5",
+                        )}
                         aria-label="Close"
                       >
                         <CloseIcon className="size-4.5" />
@@ -94,7 +105,7 @@ export function Dialog({
                   </div>
                   {children && <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-6">{children}</div>}
                   {footer && (
-                    <div className="flex flex-col-reverse gap-2 bg-surface-sunken px-6 py-4 sm:flex-row sm:justify-end">
+                    <div className={cn("flex flex-col-reverse gap-2 bg-surface-sunken px-6 py-4 sm:flex-row sm:justify-end", footerClassName)}>
                       {footer}
                     </div>
                   )}
