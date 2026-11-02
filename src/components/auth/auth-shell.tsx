@@ -7,7 +7,7 @@ import { StatusBanner } from "@/components/shell/status-banner";
 import { LogoMark } from "@/components/ui/logo";
 
 const FOOTER_LINKS = [
-  { href: "/developers", label: "Developers" },
+  { href: "/changelog", label: "Changelog" },
   { href: "/privacy", label: "Privacy" },
   { href: "/terms", label: "Terms" },
 ];
