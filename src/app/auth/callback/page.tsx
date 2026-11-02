@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
 import { AuthShell } from "@/components/auth/auth-shell";
+import { LAST_SIGN_IN } from "@/lib/auth/last-sign-in";
+import { useLocalValue } from "@/lib/local-prefs";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { toApiError } from "@/lib/api/client";
@@ -14,8 +16,8 @@ import { useSignIn } from "@/lib/auth/use-session";
 import { WarningIcon } from "@/components/ui/icons";
 
 const ERRORS: Record<string, string> = {
-  access_denied: "You cancelled Google sign-in.",
-  google_sign_in_failed: "Google sign-in didn't go through. Please try again.",
+  access_denied: "You cancelled Google log-in.",
+  google_sign_in_failed: "Google log-in didn't go through. Please try again.",
 };
 
 export default function GoogleCallbackPage() {
@@ -32,7 +34,7 @@ function Loading() {
   return (
     <div role="status" className="flex flex-col items-center py-16 text-center">
       <Spinner className="size-6 text-primary" />
-      <p className="mt-4 text-[15px] text-fg-muted">Signing you in…</p>
+      <p className="mt-4 text-[15px] text-fg-muted">Logging you in…</p>
     </div>
   );
 }
@@ -41,12 +43,13 @@ function Callback() {
   const params = useSearchParams();
   const router = useRouter();
   const signIn = useSignIn();
+  const [, setLastSignIn] = useLocalValue(LAST_SIGN_IN);
   const ticket = params.get("ticket");
   const errorCode = params.get("error");
 
   const [error, setError] = useState<string | null>(() => {
     if (errorCode) return ERRORS[errorCode] ?? ERRORS.google_sign_in_failed;
-    if (!ticket) return "This sign-in link is missing its ticket. Start again from the sign-in page.";
+    if (!ticket) return "This log-in link is missing its ticket. Start again from the log-in page.";
     return null;
   });
 
@@ -59,6 +62,7 @@ function Callback() {
     authApi
       .googleExchange(ticket)
       .then((auth) => {
+        setLastSignIn("google");
         signIn(auth);
         router.replace("/dashboard");
       })
@@ -66,11 +70,11 @@ function Callback() {
         const err = toApiError(e);
         setError(
           err.isUnauthorized
-            ? "This sign-in link has expired or was already used. Please sign in again."
+            ? "This log-in link has expired or was already used. Please log in again."
             : err.message,
         );
       });
-  }, [ticket, errorCode, signIn, router]);
+  }, [ticket, errorCode, signIn, router, setLastSignIn]);
 
   if (!error) return <Loading />;
 
@@ -84,10 +88,10 @@ function Callback() {
       <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-danger-soft text-danger-fg">
         <WarningIcon className="size-5" />
       </div>
-      <h1 className="mt-5 text-lg font-semibold tracking-[-0.02em]">Couldn&apos;t sign you in</h1>
+      <h1 className="mt-5 text-lg font-semibold tracking-[-0.02em]">Couldn&apos;t log you in</h1>
       <p className="mt-2 text-sm text-fg-muted text-pretty">{error}</p>
       <Button asChild variant="inverse" className="mt-6 w-full">
-        <Link href="/sign-in">Back to sign in</Link>
+        <Link href="/sign-in">Back to log in</Link>
       </Button>
     </motion.div>
   );

@@ -36,6 +36,7 @@ import {
   validateRows,
   type RecipientRow,
 } from "@/lib/recipients";
+import { toastTone } from "@/components/ui/toast-tone";
 
 /** What "changed" means: the filled rows, normalised the way the backend stores them. */
 function signature(rows: RecipientRow[]) {
@@ -229,7 +230,10 @@ function ListEditor({ list }: { list: ListDetail }) {
               exit={{ opacity: 0, transform: "scale(0.95)", filter: "blur(6px)", transition: { duration: 0.14, ease: [0.23, 1, 0.32, 1] } }}
               transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
               // 12px round the buttons on every side, so the corner is concentric: 10px button + 12px = 22px.
-              className="pointer-events-auto flex h-15 w-full max-w-[560px] items-center gap-1 rounded-[22px] bg-[oklch(0.25_0_0)] py-3 pr-3 pl-4 text-white shadow-lg [corner-shape:superellipse(1.5)]"
+              className={cn(
+                "pointer-events-auto flex h-15 w-full max-w-[560px] items-center gap-1 rounded-[22px] py-3 pr-3 pl-4 [corner-shape:superellipse(1.5)]",
+                toastTone.surface,
+              )}
             >
               <div className="mr-auto min-w-0">
                 <div className="truncate text-[15px] leading-5 font-medium">Unsaved changes</div>
@@ -238,7 +242,7 @@ function ListEditor({ list }: { list: ListDetail }) {
                   role={saveError ? "alert" : undefined}
                   className={cn(
                     "truncate text-[13px] leading-4",
-                    saveError ? "text-(--red-7)" : "text-white/75 max-sm:hidden",
+                    saveError ? toastTone.error : cn(toastTone.muted, "max-sm:hidden"),
                   )}
                 >
                   {saveError ?? "Leaving this page will lose them."}
@@ -248,14 +252,14 @@ function ListEditor({ list }: { list: ListDetail }) {
                 type="button"
                 onClick={discard}
                 disabled={replace.isPending}
-                className="pressable h-9 shrink-0 rounded-[10px] px-2.5 text-[14px] font-semibold whitespace-nowrap hover:bg-white/15 disabled:opacity-45"
+                className={cn("pressable h-9 shrink-0 rounded-[10px] px-2.5 text-[14px] font-semibold whitespace-nowrap disabled:opacity-45", toastTone.action)}
               >
                 Discard
               </button>
               <Button
                 onClick={save}
                 loading={replace.isPending}
-                className="ml-1 h-9 rounded-[10px] bg-white px-3.5 text-[14px] font-semibold text-fg hover:bg-(--color-200)"
+                className={cn("ml-1 h-9 rounded-[10px] px-3.5 text-[14px] font-semibold", toastTone.primary)}
               >
                 {/* One span, so the button's flex gap doesn't split the words. */}
                 <span>

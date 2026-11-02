@@ -17,6 +17,7 @@ import { useConnection } from "wagmi";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { toastTone } from "@/components/ui/toast-tone";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChevronLeftIcon, CloseIcon, DeleteIcon, EqualIcon, FileIcon, ImportIcon, PlusIcon, SplitIcon, HashIcon, CommandIcon } from "@/components/ui/icons";
 import { useRowSelection } from "@/hooks/use-row-selection";
@@ -25,6 +26,7 @@ import { LIMITS, USDC } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { formatAmount, parseAmount, pluralize, toInputAmount } from "@/lib/format";
 import {
+  emailWarning,
   emptyRow,
   isBlankRow,
   parseRecipientsText,
@@ -356,7 +358,9 @@ export function RecipientsEditor({
             <HashIcon className="size-3.5" aria-hidden={false} role="img" aria-label="Row" />
           </span>
           <span className="px-3 py-2.5">Name</span>
-          <span className="px-3 py-2.5">Email</span>
+          <span className="px-3 py-2.5 whitespace-nowrap">
+            Email <span className="text-fg-subtle/70">(optional)</span>
+          </span>
           <span className="px-3 py-2.5">Wallet address</span>
           <span className="px-3 py-2.5 text-right whitespace-nowrap">
             {amountLabel} <span className="text-fg-subtle/70">({USDC.symbol})</span>
@@ -416,7 +420,8 @@ export function RecipientsEditor({
                       value={r.email}
                       placeholder="Email"
                       type="email"
-                      error={errorFor(r.key, "email")}
+                      // Optional: a bad email is flagged amber once left, but never blocks the row.
+                      warning={showAllErrors || touched.has(`${r.key}.email`) ? emailWarning(r) : undefined}
                       disabled={disabled}
                       onChange={(v) => update(r.key, "email", v)}
                       onBlur={() => touch(r.key, "email")}
@@ -633,8 +638,7 @@ function Kbd({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Dark grey, a step up from the #111 blacks (user's call over blue 10). White on it is about 15:1.
-const TOAST_BG = "bg-[oklch(0.25_0_0)]";
+// The look (fill, ink, buttons) comes from toast-tone, shared with the app's other toasts.
 
 /**
  * Selection as a toast, after X's iOS toasts: a solid dark card that rises from the bottom,
@@ -673,8 +677,8 @@ function SelectionToast({
         transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
         className={cn(
           // 8px round the 10px buttons, so an 18px corner keeps them concentric.
-          "pointer-events-auto flex min-h-13 w-full max-w-[560px] items-center gap-1 rounded-[18px] py-2 pr-2 pl-4 text-white shadow-lg [corner-shape:superellipse(1.5)]",
-          TOAST_BG,
+          "pointer-events-auto flex min-h-13 w-full max-w-[560px] items-center gap-1 rounded-[18px] py-2 pr-2 pl-4 [corner-shape:superellipse(1.5)]",
+          toastTone.surface,
         )}
       >
         {bulk ? (
@@ -699,7 +703,7 @@ function SelectionToast({
                 </AnimatePresence>
               </span>
               <span>selected</span>
-              <span className="ml-1 truncate text-[13px] font-normal text-white/75">
+              <span className={cn("ml-1 truncate text-[13px] font-normal", toastTone.muted)}>
                 {formatAmount(total)} {USDC.symbol}
               </span>
             </p>
@@ -712,7 +716,7 @@ function SelectionToast({
               <button
                 type="button"
                 onClick={onClear}
-                className="pressable ml-1 h-9 shrink-0 rounded-[10px] bg-white px-3.5 text-[14px] font-semibold whitespace-nowrap text-fg hover:bg-(--color-200)"
+                className={cn("pressable ml-1 h-9 shrink-0 rounded-[10px] px-3.5 text-[14px] font-semibold whitespace-nowrap", toastTone.primary)}
               >
                 Done
               </button>
@@ -724,13 +728,13 @@ function SelectionToast({
   );
 }
 
-/** Bold white text action, like the "View" on X's toasts. */
+/** Bold text action, like the "View" on X's toasts. */
 function ToastAction({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="pressable h-9 shrink-0 rounded-[10px] px-2.5 text-[14px] font-semibold whitespace-nowrap hover:bg-white/15"
+      className={cn("pressable h-9 shrink-0 rounded-[10px] px-2.5 text-[14px] font-semibold whitespace-nowrap", toastTone.action)}
     >
       {children}
     </button>
@@ -778,6 +782,8 @@ function Cell({
           // Invalid: red fill and a red border (the red scale's border step), on desktop too
           // where table cells are otherwise borderless.
           error && "border-(--red-7) bg-danger-soft/60 text-danger-fg md:border-(--red-7) md:bg-danger-soft/50",
+          // Warning (optional email typo, a wallet paid twice): the same treatment in amber.
+          !error && warning && "border-(--amber-7) bg-warning-soft/60 text-warning-fg md:border-(--amber-7) md:bg-warning-soft/50",
           className,
         )}
         {...props}
@@ -841,7 +847,7 @@ function BulkBar({
     </div>
   );
 
-  // Inside the selection toast: white on the toast's dark grey, the hint on its own line so the row fits.
+  // Inside the selection toast: its tone's ink and input, the hint on its own line so the row fits.
   if (tone === "toast") {
     return (
       <form onSubmit={submit} className="flex flex-col gap-1.5 py-0.5">
@@ -849,7 +855,7 @@ function BulkBar({
           <button
             type="button"
             onClick={onClose}
-            className="pressable -ml-2 grid size-9 place-items-center rounded-[10px] text-white/80 hover:bg-white/15 hover:text-white"
+            className={cn("pressable -ml-2 grid size-9 place-items-center rounded-[10px]", toastTone.muted, toastTone.action)}
             aria-label="Back"
           >
             {/* Back to the selection summary, not a dismiss: a chevron, not a cross. */}
@@ -859,17 +865,17 @@ function BulkBar({
             {kind === "same" ? `Amount for ${pluralize(count, "person", "people")}` : `Split between ${pluralize(count, "person", "people")}`}
           </span>
           {input(
-            "rounded-[10px] border-white/15 bg-white/10 text-white placeholder:text-white/50 hover:border-white/22 hover:bg-white/[0.12] focus:border-white/45 focus:bg-white/15 aria-invalid:border-[oklch(0.85_0.09_25)]",
-            "text-white/70",
+            cn("rounded-[10px]", toastTone.input),
+            toastTone.muted,
           )}
           <button
             type="submit"
-            className="pressable ml-auto h-9 shrink-0 rounded-[10px] bg-white px-3.5 text-[14px] font-semibold whitespace-nowrap text-fg hover:bg-(--color-200)"
+            className={cn("pressable ml-auto h-9 shrink-0 rounded-[10px] px-3.5 text-[14px] font-semibold whitespace-nowrap", toastTone.primary)}
           >
             Apply
           </button>
         </div>
-        <p className={cn("pl-9 text-[12px]", error ? "font-medium text-[oklch(0.92_0.06_25)]" : "text-white/75")}>{hint}</p>
+        <p className={cn("pl-9 text-[12px]", error ? cn("font-medium", toastTone.error) : toastTone.muted)}>{hint}</p>
       </form>
     );
   }

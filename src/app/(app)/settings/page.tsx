@@ -77,7 +77,7 @@ export default function SettingsPage() {
           <h2 className="text-[15px] font-medium tracking-[-0.006em]">Account</h2>
           <dl className="mt-4 flex flex-col gap-2.5 text-[13px]">
             <div className="flex items-center justify-between gap-3">
-              <dt className="text-fg-subtle">Signed in as</dt>
+              <dt className="text-fg-subtle">Logged in as</dt>
               <dd className="font-medium">{user?.email ?? "—"}</dd>
             </div>
           </dl>

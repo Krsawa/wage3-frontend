@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Suspense,
@@ -11,13 +11,16 @@ import {
   type ClipboardEvent,
   type FormEvent,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
 
 import { AuthShell } from "@/components/auth/auth-shell";
+import { LAST_SIGN_IN } from "@/lib/auth/last-sign-in";
+import { useLocalValue } from "@/lib/local-prefs";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { ArrowRightIcon, ChevronLeftIcon, MailIcon } from "@/components/ui/icons";
+import { ChevronLeftIcon } from "@/components/ui/icons";
 import { authApi } from "@/lib/api/endpoints";
 import { cn } from "@/lib/cn";
 import { useSession, useSignIn } from "@/lib/auth/use-session";
@@ -41,7 +44,7 @@ const stepMotion = {
 
 export default function SignInPage() {
   return (
-    <AuthShell>
+    <AuthShell footer={<GooglePill />}>
       <Suspense fallback={<div className="grid h-80 place-items-center"><Spinner className="text-fg-subtle" /></div>}>
         <SignIn />
       </Suspense>
@@ -55,6 +58,7 @@ function SignIn() {
   const next = safeNext(params.get("next"));
   const { hydrated, isAuthenticated } = useSession();
   const signIn = useSignIn();
+  const [, setLastSignIn] = useLocalValue(LAST_SIGN_IN);
 
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
@@ -82,6 +86,7 @@ function SignIn() {
     onError: () => setAttempt((a) => a + 1),
     onSuccess: (auth) => {
       setRedirecting(true);
+      setLastSignIn("email");
       signIn(auth);
       router.replace(next);
     },
@@ -143,7 +148,6 @@ function EmailStep({
   clearError: () => void;
 }) {
   const [localError, setLocalError] = useState<string | null>(null);
-  const [google, setGoogle] = useState(false);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -155,43 +159,26 @@ function EmailStep({
   };
 
   const shownError = localError ?? error;
+  const ready = /@[^@\s]+\./.test(email) || pending;
 
   return (
     <div>
-      <h1 className="headline text-[30px]">Sign in to Wage3</h1>
-      <p className="mt-2.5 text-[15px] text-fg-muted text-pretty">
-        New or returning, it&apos;s the same step. We&apos;ll email you a 6-digit code.
-      </p>
+      {/* Centred under the mark, after Aave Account: title and subtitle read as one item (4px). */}
+      <h1 className="headline text-center text-[22px] leading-7">Welcome to Wage3</h1>
+      <p className="mt-1 text-center text-[15px] text-fg-muted text-pretty">Log in or sign up to get started.</p>
 
-      <Button
-        variant="outline"
-        size="lg"
-        className="mt-8 w-full"
-        loading={google}
-        onClick={() => {
-          setGoogle(true);
-          window.location.href = authApi.googleStartUrl;
-        }}
-      >
-        <GoogleIcon /> Continue with Google
-      </Button>
-
-      <div className="my-6 flex items-center gap-3 text-xs text-fg-subtle">
-        <span className="h-px flex-1 bg-border" />
-        or
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <form onSubmit={submit} noValidate className="flex flex-col gap-4">
-        <Field label="Email" htmlFor="email" error={shownError}>
+      <form onSubmit={submit} noValidate className="mt-8 flex flex-col gap-4">
+        {/* A filled field, no label (the placeholder and aria-label name it), as in the reference. */}
+        <Field htmlFor="email" error={shownError}>
           <Input
             id="email"
             type="email"
             autoComplete="email"
             inputMode="email"
             autoFocus
-            placeholder="you@company.com"
-            leading={<MailIcon className="size-4" />}
+            aria-label="Email"
+            placeholder="Email address"
+            className="h-12 rounded-full border-transparent bg-(--color-400) px-5 font-medium hover:border-transparent"
             value={email}
             invalid={!!shownError}
             onChange={(e) => {
@@ -201,14 +188,33 @@ function EmailStep({
             }}
           />
         </Field>
-        <Button type="submit" size="lg" className="w-full" loading={pending}>
-          Continue <ArrowRightIcon className="size-4" />
-        </Button>
+        {/* One slot for the note and the button. Until the email reaches its domain's "."
+            (you@company.) the note sits here; then it lifts away and Continue bounces up into
+            its place. Enter still submits either way. */}
+        <div className="relative h-12">
+          <motion.p
+            initial={false}
+            animate={ready ? { opacity: 0, transform: "translateY(-6px)" } : { opacity: 1, transform: "translateY(0px)" }}
+            transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
+            aria-hidden={ready}
+            className="pointer-events-none absolute inset-0 grid place-items-center text-center text-[13px] text-fg-subtle"
+          >
+            We&apos;ll sign you up if you don&apos;t have an account yet.
+          </motion.p>
+          <motion.div
+            initial={false}
+            animate={ready ? { opacity: 1, transform: "translateY(0px)" } : { opacity: 0, transform: "translateY(16px)" }}
+            transition={ready ? { type: "spring", duration: 0.5, bounce: 0.4 } : { duration: 0.14 }}
+            aria-hidden={!ready}
+            className={cn("absolute inset-0", !ready && "pointer-events-none")}
+          >
+            <Button type="submit" variant="inverse" size="lg" className="w-full" loading={pending} tabIndex={ready ? 0 : -1}>
+              Continue
+            </Button>
+          </motion.div>
+        </div>
       </form>
 
-      <p className="mt-6 text-center text-xs text-fg-subtle text-pretty">
-        By continuing you agree to use Wage3 to send funds you control. We never hold your USDC.
-      </p>
     </div>
   );
 }
@@ -312,13 +318,13 @@ function CodeStep({
       <button
         type="button"
         onClick={onBack}
-        className="pressable -ml-2 mb-6 inline-flex h-8 items-center gap-1.5 rounded-full px-2 text-[13px] font-medium text-fg-muted hover:bg-surface-hover hover:text-fg"
+        className="pressable mx-auto mb-4 flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium text-fg-muted hover:bg-surface-hover hover:text-fg"
       >
         <ChevronLeftIcon className="size-3.5" /> Use a different email
       </button>
-      <h1 className="headline text-[30px]">Check your email</h1>
-      <p className="mt-2.5 text-[15px] text-fg-muted text-pretty">
-        We sent a 6-digit code to <span className="font-medium text-fg break-all">{email}</span>. It expires in 10
+      <h1 className="headline text-center text-[22px] leading-7">Check your email</h1>
+      <p className="mt-1 text-center text-[15px] text-fg-muted text-pretty">
+        We sent a 6‑digit code to <span className="font-medium text-fg break-all">{email}</span>. It expires in 10
         minutes.
       </p>
 
@@ -377,7 +383,7 @@ function CodeStep({
           loading={pending}
           disabled={digits.join("").length !== CODE_LENGTH}
         >
-          Verify and sign in
+          Verify and log in
         </Button>
       </form>
 
@@ -402,6 +408,67 @@ function CodeStep({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Google log-in as the pill at the foot of the page (after Aave Account's). "Last used" shows
+ * when Google was this browser's last way in (set on click and again by the callback).
+ */
+function GooglePill() {
+  const [last, setLast] = useLocalValue(LAST_SIGN_IN);
+  const [going, setGoing] = useState(false);
+  const lastUsed = last === "google";
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setGoing(true);
+        // Recorded on the way out: Google's return trip lands on whichever frontend the backend
+        // is configured for, so the callback can't be relied on to write it here.
+        setLast("google");
+        window.location.href = authApi.googleStartUrl;
+      }}
+      disabled={going}
+      className="pressable relative inline-flex h-10 items-center gap-2.5 rounded-full bg-surface px-4 text-[14px] font-medium shadow-(--shadow-xs) hover:shadow-(--shadow-sm) disabled:opacity-70"
+    >
+      {going ? <Spinner className="size-4.5" /> : <GoogleIcon />}
+      Continue with Google
+      {/* A badge on the top-right corner, from the Figma frame: #606cec fill, 1px #d5e0ff edge,
+          24px tall, 8/5 padding, 12px radius (as oklch),
+          straddling the edge so it reads as a tag on the button, not part of its label. */}
+      {lastUsed && (
+        <span className="absolute -top-3 -right-5 inline-flex h-6 items-center rounded-[12px] border border-[oklch(0.908_0.044_270)] bg-[oklch(0.59_0.191_274.9)] px-2 py-[5px] text-[12px] leading-none font-medium shadow-(--shadow-xs)">
+          <Shimmer tone="light">Last used</Shimmer>
+        </span>
+      )}
+    </button>
+  );
+}
+
+/**
+ * Antalik's t-shimmer, adapted for light grounds: muted ink with a near-black band sweeping
+ * across every 2s (a 90° gradient clipped to the text, its position animated). Still under
+ * reduced motion.
+ */
+function Shimmer({ children, tone = "dark" }: { children: ReactNode; tone?: "dark" | "light" }) {
+  const reduce = useReducedMotion();
+  // Dark: muted ink with a near-black band. Light (on a coloured badge): soft white, white band.
+  const [base, peak] = tone === "light" ? ["oklch(1 0 0 / 0.72)", "oklch(1 0 0)"] : ["var(--fg-muted)", "var(--fg)"];
+  return (
+    <motion.span
+      className="bg-clip-text text-transparent"
+      style={{
+        backgroundImage:
+          `linear-gradient(90deg, ${base} 0%, ${base} 40%, ${peak} 50%, ${base} 60%, ${base} 100%)`,
+        backgroundSize: "400% 100%",
+        backgroundPosition: "100% 0",
+      }}
+      animate={reduce ? undefined : { backgroundPosition: ["100% 0", "0% 0"] }}
+      transition={{ duration: 2, ease: "linear", repeat: Infinity }}
+    >
+      {children}
+    </motion.span>
   );
 }
 

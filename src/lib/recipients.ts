@@ -29,8 +29,8 @@ export function validateRow(r: RecipientRow, mode: EditorMode): RowErrors {
   const errors: RowErrors = {};
   const wallet = validateWallet(r.wallet);
   if (wallet) errors.wallet = wallet;
-  const email = validateEmail(r.email);
-  if (email) errors.email = email;
+  // Email is optional and doesn't affect the payment: a bad one is a warning in the editor
+  // (see emailWarning) and is left out of what's sent, never a reason a row can't be paid.
   if (r.name.trim().length > 100) errors.name = "At most 100 characters";
   if (mode === "payout" || r.amount.trim()) {
     const amount = parseAmount(r.amount);
@@ -82,12 +82,18 @@ export function rowsTotal(rows: RecipientRow[]): bigint {
 
 const opt = (s: string) => (s.trim() ? s.trim() : null);
 
+/** Optional email: kept only when it's a real address, so a typo never fails the request. */
+const optEmail = (s: string) => (opt(s) && !validateEmail(s) ? s.trim() : null);
+
+/** A typed email that isn't one. A warning only: emails are optional. */
+export const emailWarning = (r: RecipientRow) => (r.email.trim() ? (validateEmail(r.email) ?? undefined) : undefined);
+
 export function rowsToRecipientInputs(rows: RecipientRow[]): RecipientInput[] {
   return rows.filter((r) => !isBlankRow(r)).map((r) => {
     const a = r.amount.trim() ? parseAmount(r.amount) : null;
     return {
       name: opt(r.name),
-      email: opt(r.email),
+      email: optEmail(r.email),
       wallet_address: r.wallet.trim(),
       default_amount: a && a.ok ? a.value : null,
     };
@@ -99,7 +105,7 @@ export function rowsToPayoutItems(rows: RecipientRow[]): PayoutItemInput[] {
     const a = parseAmount(r.amount);
     return {
       name: opt(r.name),
-      email: opt(r.email),
+      email: optEmail(r.email),
       wallet_address: r.wallet.trim(),
       amount: a.ok ? a.value : "0",
     };

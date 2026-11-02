@@ -45,7 +45,7 @@ export function UserCard() {
       </DropdownTrigger>
       <DropdownContent className="w-56">
         <DropdownItem icon={<LogOut />} onSelect={signOut}>
-          Sign out
+          Log out
         </DropdownItem>
       </DropdownContent>
     </DropdownMenu>
@@ -76,7 +76,7 @@ export function UserMenu() {
         </DropdownLabel>
         <DropdownSeparator />
         <DropdownItem icon={<LogOut />} onSelect={signOut}>
-          Sign out
+          Log out
         </DropdownItem>
       </DropdownContent>
     </DropdownMenu>

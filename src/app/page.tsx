@@ -74,7 +74,7 @@ export default function LandingPage() {
           <div className="ml-auto flex items-center gap-1.5">
             {!isAuthenticated && (
               <Button asChild variant="ghost" size="sm">
-                <Link href="/sign-in">Sign in</Link>
+                <Link href="/sign-in">Log in</Link>
               </Button>
             )}
             <PrimaryCta size="md" />
@@ -106,7 +106,7 @@ export default function LandingPage() {
               </Button>
             </motion.div>
             <motion.p variants={item} className="mt-6 text-[13px] text-fg-subtle">
-              Free to start. Sign in with email or Google. Connect any wallet.
+              Free to start. Sign up with email or Google. Connect any wallet.
             </motion.p>
           </motion.div>
 
@@ -206,7 +206,7 @@ export default function LandingPage() {
               Built on Base <ArrowUpRight className="size-3.5" />
             </a>
             <Link href="/sign-in" className="transition-colors duration-150 hover:text-fg">
-              Sign in
+              Log in
             </Link>
           </div>
         </div>
