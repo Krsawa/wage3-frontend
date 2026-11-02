@@ -6,11 +6,7 @@ import type { ReactNode } from "react";
 import { StatusBanner } from "@/components/shell/status-banner";
 import { LogoMark } from "@/components/ui/logo";
 
-const FOOTER_LINKS = [
-  { href: "/changelog", label: "Changelog" },
-  { href: "/privacy", label: "Privacy" },
-  { href: "/terms", label: "Terms" },
-];
+const FOOTER_LINKS = [{ href: "/changelog", label: "Changelog" }];
 
 /**
  * Sign-in and the Google callback: one centred column (after Aave Account's sign-in), the mark
@@ -32,8 +28,8 @@ export function AuthShell({ children, footer }: { children: ReactNode; footer?: 
       </main>
       <footer className="flex flex-col items-center gap-5 px-4 pb-8">
         {footer}
-        {/* As in the reference: quiet links with dot separators. The pages are still to come. */}
-        <nav aria-label="Legal" className="flex items-center gap-2.5 text-[13px] text-fg-subtle">
+        {/* As in the reference: quiet links with dot separators (just Changelog for now). */}
+        <nav aria-label="More" className="flex items-center gap-2.5 text-[13px] text-fg-subtle">
           {FOOTER_LINKS.map((l, i) => (
             <span key={l.href} className="flex items-center gap-2.5">
               {i > 0 && <span aria-hidden className="size-0.5 rounded-full bg-current opacity-60" />}

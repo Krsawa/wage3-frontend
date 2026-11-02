@@ -23,6 +23,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { ChevronLeftIcon } from "@/components/ui/icons";
 import { authApi } from "@/lib/api/endpoints";
 import { cn } from "@/lib/cn";
+import { DISPLAY_TEXT } from "@/lib/type";
 import { useSession, useSignIn } from "@/lib/auth/use-session";
 
 const CODE_LENGTH = 6;
@@ -164,8 +165,8 @@ function EmailStep({
   return (
     <div>
       {/* Centred under the mark, after Aave Account: title and subtitle read as one item (4px). */}
-      <h1 className="headline text-center text-[22px] leading-7">Welcome to Wage3</h1>
-      <p className="mt-1 text-center text-[15px] text-fg-muted text-pretty">Log in or sign up to get started.</p>
+      <h1 className={cn(DISPLAY_TEXT, "text-center text-[22px] leading-7 font-semibold tracking-[-0.02em]")}>Welcome to Wage3</h1>
+      <p className={cn(DISPLAY_TEXT, "mt-1 text-center text-[15px] text-fg-muted text-pretty")}>Log in or sign up to get started.</p>
 
       <form onSubmit={submit} noValidate className="mt-8 flex flex-col gap-4">
         {/* A filled field, no label (the placeholder and aria-label name it), as in the reference. */}
@@ -175,7 +176,6 @@ function EmailStep({
             type="email"
             autoComplete="email"
             inputMode="email"
-            autoFocus
             aria-label="Email"
             placeholder="Email address"
             className="h-12 rounded-full border-transparent bg-(--color-400) px-5 font-medium hover:border-transparent"
@@ -322,8 +322,8 @@ function CodeStep({
       >
         <ChevronLeftIcon className="size-3.5" /> Use a different email
       </button>
-      <h1 className="headline text-center text-[22px] leading-7">Check your email</h1>
-      <p className="mt-1 text-center text-[15px] text-fg-muted text-pretty">
+      <h1 className={cn(DISPLAY_TEXT, "text-center text-[22px] leading-7 font-semibold tracking-[-0.02em]")}>Check your email</h1>
+      <p className={cn(DISPLAY_TEXT, "mt-1 text-center text-[15px] text-fg-muted text-pretty")}>
         We sent a 6‑digit code to <span className="font-medium text-fg break-all">{email}</span>. It expires in 10
         minutes.
       </p>
