@@ -435,10 +435,12 @@ function FirstRun() {
 
 // ---- Lists ----
 
-/** Saved lists as cards, the way a dashboard groups its main objects. */
+/** At most 3 cards: the first two lists and New list. The rest live behind "All lists". */
+const MAX_LIST_CARDS = 2;
+
 function ListsGrid() {
   const lists = useLists();
-  const items = (lists.data ?? []).slice(0, 6);
+  const items = (lists.data ?? []).slice(0, MAX_LIST_CARDS);
 
   if (lists.isLoading) {
     return (
