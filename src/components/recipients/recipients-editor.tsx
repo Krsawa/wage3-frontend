@@ -19,11 +19,12 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toastTone } from "@/components/ui/toast-tone";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ChevronLeftIcon, CloseIcon, DeleteIcon, EqualIcon, FileIcon, ImportIcon, PlusIcon, SplitIcon, HashIcon, CommandIcon } from "@/components/ui/icons";
+import { ChevronLeftIcon, CloseIcon, DeleteIcon, EqualIcon, ImportIcon, PlusIcon, SplitIcon, HashIcon, CommandIcon } from "@/components/ui/icons";
 import { useRowSelection } from "@/hooks/use-row-selection";
 import { useHydrated } from "@/lib/auth/use-session";
 import { LIMITS, USDC } from "@/lib/config";
 import { cn } from "@/lib/cn";
+import { DISPLAY_TEXT } from "@/lib/type";
 import { formatAmount, parseAmount, pluralize, toInputAmount } from "@/lib/format";
 import {
   emailWarning,
@@ -320,7 +321,7 @@ export function RecipientsEditor({
             className="group hidden overflow-hidden text-left md:block"
           >
             <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-dashed border-border px-4 py-3 text-[13px] text-fg-muted transition-colors duration-150 group-hover:bg-surface-hover">
-              <FileIcon className="size-4 shrink-0" />
+              <ImportIcon className="size-4 shrink-0" />
               <span>
                 Drop a CSV anywhere on this page, or <span className="font-medium text-fg">choose a file</span>.
                 You&apos;ll pick who to add before anything changes.
@@ -333,6 +334,7 @@ export function RecipientsEditor({
       {/* Table */}
       <div
         className={cn(
+          "relative",
           flush === "end" ? "-mx-5 -mb-5 border-t border-border" : flush ? "-mx-5 border-y border-border" : "overflow-hidden rounded-2xl border border-border",
         )}
       >
@@ -520,6 +522,8 @@ export function RecipientsEditor({
             </span>
           </button>
         )}
+        {/* A file dragged anywhere on the page lights up the table it will land in. */}
+        <TableDropTarget active={pageDragging} mode={mode} />
       </div>
 
       <ImportDialog
@@ -536,8 +540,6 @@ export function RecipientsEditor({
         dropped={dropped}
         onClearDropped={clearDropped}
       />
-
-      <PageDropOverlay active={pageDragging} />
     </div>
   );
 }
@@ -597,7 +599,11 @@ function usePageFileDrop({ enabled, onDrop }: { enabled: boolean; onDrop: (file:
   return dragging;
 }
 
-function PageDropOverlay({ active }: { active: boolean }) {
+/**
+ * The table as the drop target while a file is dragged over the page: a blue-3 wash ruled in
+ * blue-9, the same pair the selection uses. The message sticks in view on a long table.
+ */
+function TableDropTarget({ active, mode }: { active: boolean; mode: EditorMode }) {
   return (
     <AnimatePresence>
       {active && (
@@ -607,20 +613,25 @@ function PageDropOverlay({ active }: { active: boolean }) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.12 } }}
           transition={{ duration: 0.15 }}
-          className="pointer-events-none fixed inset-0 z-[60] bg-bg/80 p-3 backdrop-blur-[2px]"
+          className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] bg-(--blue-3) ring-2 ring-(--blue-9) ring-inset"
         >
-          <div className="grid h-full place-items-center rounded-3xl border-2 border-dashed border-primary bg-primary-soft/50">
+          <div className="sticky top-0 grid h-[min(100%,100dvh)] place-items-center p-6">
             <motion.div
               initial={{ opacity: 0, transform: "scale(0.96)" }}
               animate={{ opacity: 1, transform: "scale(1)" }}
               transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
-              className="flex flex-col items-center text-center"
+              className="flex items-center gap-3"
             >
-              <span className="grid size-14 place-items-center rounded-2xl bg-primary text-primary-fg">
-                <FileIcon className="size-6" />
+              {/* Icon beside the words, so the message fits a table of one row. */}
+              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-(--blue-9) text-white">
+                <ImportIcon className="size-5" />
               </span>
-              <span className="mt-4 text-lg font-semibold tracking-[-0.02em]">Drop to import people</span>
-              <span className="mt-1 text-sm text-fg-muted">CSV with name, email, wallet and amount columns</span>
+              <span className="flex flex-col">
+                <span className={cn(DISPLAY_TEXT, "text-[17px] leading-6 font-semibold tracking-[-0.02em] text-(--blue-12)")}>
+                  Drop to add to this {mode === "list" ? "list" : "payment"}
+                </span>
+                <span className="text-[13px] leading-5 text-(--blue-11)">Name, email, wallet and amount. Only wallet is required.</span>
+              </span>
             </motion.div>
           </div>
         </motion.div>

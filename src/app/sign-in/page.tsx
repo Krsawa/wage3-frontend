@@ -20,7 +20,6 @@ import { useLocalValue } from "@/lib/local-prefs";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { ChevronLeftIcon } from "@/components/ui/icons";
 import { authApi } from "@/lib/api/endpoints";
 import { cn } from "@/lib/cn";
 import { DISPLAY_TEXT } from "@/lib/type";
@@ -45,11 +44,17 @@ const stepMotion = {
 
 export default function SignInPage() {
   return (
-    <AuthShell footer={<GooglePill />}>
-      <Suspense fallback={<div className="grid h-80 place-items-center"><Spinner className="text-fg-subtle" /></div>}>
-        <SignIn />
-      </Suspense>
-    </AuthShell>
+    <Suspense
+      fallback={
+        <AuthShell>
+          <div className="grid h-80 place-items-center">
+            <Spinner className="text-fg-subtle" />
+          </div>
+        </AuthShell>
+      }
+    >
+      <SignIn />
+    </Suspense>
   );
 }
 
@@ -94,7 +99,18 @@ function SignIn() {
   });
 
   return (
-    <div>
+    <AuthShell
+      footer={
+        // Google is a way in, not a way past the code: it leaves once an email code is on its way.
+        <AnimatePresence initial={false}>
+          {step === "email" && (
+            <motion.div key="google" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.12 } }}>
+              <GooglePill />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      }
+    >
       <AnimatePresence mode="wait" initial={false}>
         {step === "email" ? (
           <motion.div key="email" {...stepMotion}>
@@ -129,7 +145,7 @@ function SignIn() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </AuthShell>
   );
 }
 
@@ -315,17 +331,10 @@ function CodeStep({
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={onBack}
-        className="pressable mx-auto mb-4 flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium text-fg-muted hover:bg-surface-hover hover:text-fg"
-      >
-        <ChevronLeftIcon className="size-3.5" /> Use a different email
-      </button>
+      {/* Same head as the email step, so the title stays put when the step changes. */}
       <h1 className={cn(DISPLAY_TEXT, "text-center text-[22px] leading-7 font-semibold tracking-[-0.02em]")}>Check your email</h1>
       <p className={cn(DISPLAY_TEXT, "mt-1 text-center text-[15px] text-fg-muted text-pretty")}>
-        We sent a 6‑digit code to <span className="font-medium text-fg break-all">{email}</span>. It expires in 10
-        minutes.
+        Enter the code we sent to <span className="font-medium text-fg break-all">{email}</span>
       </p>
 
       <form
@@ -353,16 +362,17 @@ function CodeStep({
               maxLength={CODE_LENGTH}
               aria-label={`Digit ${i + 1}`}
               aria-invalid={!!error || undefined}
+              // Grey wells like the email field; the one being typed in turns white with a dark edge.
               className={cn(
-                "h-14 w-full min-w-0 rounded-xl border border-border bg-surface text-center font-mono text-2xl font-medium tabular outline-none",
-                "transition-[border-color,box-shadow] duration-150 focus:border-primary focus:shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_18%,transparent)]",
-                "disabled:opacity-60 aria-invalid:border-danger",
+                "h-14 w-full min-w-0 rounded-2xl border border-transparent bg-(--color-400) text-center font-mono text-2xl font-medium tabular outline-none [corner-shape:superellipse(1.5)]",
+                "transition-[border-color,background-color] duration-150 focus:border-(--color-900) focus:bg-surface",
+                "disabled:opacity-60 aria-invalid:border-danger aria-invalid:bg-danger-soft",
               )}
             />
           ))}
         </fieldset>
 
-        <div className="mt-3 min-h-5 text-[13px]">
+        <div className="mt-3 min-h-5 text-center text-[13px]">
           {pending ? (
             <span className="inline-flex items-center gap-2 text-fg-muted">
               <Spinner className="size-3.5" /> Verifying…
@@ -376,26 +386,17 @@ function CodeStep({
           ) : null}
         </div>
 
-        <Button
-          type="submit"
-          size="lg"
-          className="mt-4 w-full"
-          loading={pending}
-          disabled={digits.join("").length !== CODE_LENGTH}
-        >
-          Verify and log in
-        </Button>
       </form>
 
-      <div className="mt-6 text-center text-[13px] text-fg-muted">
+      {/* No Verify button: the sixth digit submits. Resend and going back share one quiet line. */}
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px] text-fg-muted">
         {resendError && (
-          <p role="alert" className="mb-2 text-danger-fg">
+          <p role="alert" className="mb-1 basis-full text-center text-danger-fg">
             {resendError}
           </p>
         )}
-        Didn&apos;t get it?{" "}
         {secondsLeft > 0 ? (
-          <span className="tabular text-fg-subtle">Resend in {secondsLeft}s</span>
+          <span className="tabular text-fg-subtle">Resend code in {secondsLeft}s</span>
         ) : (
           <button
             type="button"
@@ -406,6 +407,10 @@ function CodeStep({
             {resendPending ? "Sending…" : "Resend code"}
           </button>
         )}
+        <span aria-hidden className="text-fg-subtle">·</span>
+        <button type="button" onClick={onBack} className="font-medium text-fg underline-offset-4 hover:underline">
+          Use a different email
+        </button>
       </div>
     </div>
   );

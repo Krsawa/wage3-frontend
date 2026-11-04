@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/input";
-import { DownloadIcon, FileIcon, WarningIcon } from "@/components/ui/icons";
+import { DownloadIcon, FileIcon, ImportIcon, WarningIcon } from "@/components/ui/icons";
 import { useRowSelection } from "@/hooks/use-row-selection";
 import { USDC } from "@/lib/config";
 import { cn } from "@/lib/cn";
@@ -169,13 +169,15 @@ export function ImportDialog({
                 onDrop={onDrop}
                 className={cn(
                   "flex w-full flex-col items-center rounded-2xl border border-dashed px-6 py-8 text-center transition-colors duration-150",
-                  dragging ? "border-primary bg-primary-soft" : "border-border hover:border-border-strong hover:bg-surface-hover",
+                  // Only the edge and the fill change, in the selection's blue pair.
+                  dragging ? "border-solid border-(--blue-9) bg-(--blue-3)" : "border-border hover:border-border-strong hover:bg-surface-hover",
                 )}
               >
-                <span className={cn("grid size-11 place-items-center rounded-full transition-colors", dragging ? "bg-primary text-primary-fg" : "bg-surface-muted text-fg-muted")}>
-                  <FileIcon className="size-5" />
+                {/* The same mark as Import CSV and the table's drop target. */}
+                <span className="grid size-10 place-items-center rounded-full bg-surface-muted text-fg-muted">
+                  <ImportIcon className="size-5" />
                 </span>
-                <span className="mt-4 text-sm font-medium">
+                <span className="mt-3 text-sm font-medium">
                   <span className="sm:hidden">Choose a CSV file</span>
                   <span className="hidden sm:inline">Drop a CSV here, or click to choose</span>
                 </span>
